@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.4.1 / 9 (2026-08-25)
+
+**Hotfix – App starb nach 2 Sekunden beim Start (0.4.0)**
+
+- **Root Cause:** Die Migration v1→v2 führte `ADD COLUMN templateId` aus — diese Spalte existierte aber bereits seit dem v1-Schema (0.2.0). Auf Geräten mit bestehender Datenbank krachte die Migration mit „duplicate column name" beim ersten DB-Zugriff: kurz sichtbarer Screen, dann Prozessende. Frischinstallationen waren nicht betroffen (die starten direkt mit Schema v2).
+- **Fix:** Migration fügt Spalten nur noch hinzu, wenn sie nicht existieren (PRAGMA-Check) — robust für alle Ausgangslagen.
+- Lehre ins Memory: Bei Room-Migrationen immer gegen die tatsächliche Historie des Entity prüfen (`git show <tag>:…Entity.kt`), nicht gegen das Gedächtnis.
+
 ## 0.4.0 / 8 (2026-08-25)
 
 **Phase 3 – LLM-Zusammenfassungen + Theme-Umschalter**
