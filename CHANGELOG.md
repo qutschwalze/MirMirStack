@@ -2,6 +2,15 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.4.4 / 12 (2026-08-25)
+
+**Fix – „LLM canceled" nach App-Schließen**
+
+Feldbefund: Nach dem Schließen des Share-Screens brach der laufende LLM-Aufruf ab und wurde fälschlich als FAILED („LLM: Canceled") verbucht — erst ein manuelles Wiederholen brachte das Ergebnis.
+
+- **Ursache:** Werden Android den Worker-Prozess stoppt, bricht die Coroutine mit `CancellationException` ab. Der pauschale `catch (Exception)` behandelte diesen *Abbruch* als *Fehler*.
+- **Fix:** Abbruch wird jetzt in allen Stufen erkannt (Summarize/Publish/ShareReceive) und sauber an WorkManager durchgereicht — der setzt gestoppte Jobs **automatisch fort**. Das Item geht ehrlich auf QUEUED („Unterbrochen – wird automatisch fortgesetzt") statt auf FAILED.
+
 ## 0.4.3 / 11 (2026-08-25)
 
 **PDF-Support, Auto-Start, klarere LLM-Fehler**

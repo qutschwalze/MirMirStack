@@ -189,6 +189,9 @@ suspend fun receiveSharedItem(
             sourceKind = kind,
             warning = extracted.warning
         )
+    } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
+        // Share-Screen frueh geschlossen -> kein FEHLER-Eintrag, nur sauber beenden.
+        throw ce
     } catch (t: Throwable) {
         return failState(
             appContext, referrerHost,

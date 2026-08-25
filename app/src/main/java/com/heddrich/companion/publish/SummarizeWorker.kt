@@ -44,6 +44,16 @@ class SummarizeWorker(
         // ── PROCESS ────────────────────────────────────────────────────────
         val processed = try {
             process(item)
+        } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
+            // Worker wurde gestoppt (Prozessende/Netzwechsel) – KEIN Fehlerfall:
+            // Ehrlich auf QUEUED zuruecksetzen; WorkManager setzt den Job selbst fort.
+            dao.update(
+                item.copy(
+                    status = IngestStatus.QUEUED,
+                    error = "Unterbrochen – wird automatisch fortgesetzt"
+                )
+            )
+            throw ce
         } catch (e: Exception) {
             // Verstaendliche Diagnose: HTTP-Code + Body-Auszug statt nur Klassenname
             val reason = when (e) {

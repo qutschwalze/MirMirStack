@@ -86,6 +86,9 @@ object Publisher {
                 wikiUrl = client.webUrlFor(page),
                 created = created
             )
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Abbruch ist kein Publish-Fehler – WorkManager entscheidet ueber Retry.
+            throw e
         } catch (e: Exception) {
             PublishResult.Failure(reasonText(e))
         }
