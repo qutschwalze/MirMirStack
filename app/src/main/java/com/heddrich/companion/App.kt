@@ -7,5 +7,6 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         CompanionDatabase.appContext = this
+        CrashGuard.install(this)
     }
 }

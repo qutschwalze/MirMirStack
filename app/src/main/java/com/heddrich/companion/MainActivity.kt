@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.heddrich.companion.data.CompanionDatabase
+import com.heddrich.companion.inbox.InfoSection
 import com.heddrich.companion.inbox.InboxRoute
 
 class MainActivity : ComponentActivity() {
@@ -65,25 +66,8 @@ fun MainScaffold() {
             if (tab == 0) {
                 InboxRoute()
             } else {
-                InfoTab(versionLine)
+                InfoSection(versionLine)
             }
         }
-    }
-}
-
-@Composable
-private fun InfoTab(versionLine: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-    ) {
-        Text("MirMirStack", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(8.dp))
-        Text("Share Target -> BookStack", style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.height(24.dp))
-        Text(versionLine, style = MaterialTheme.typography.labelMedium)
     }
 }

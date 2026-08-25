@@ -20,4 +20,7 @@ interface IngestItemDao {
 
     @Query("SELECT * FROM ingest_items WHERE id = :id")
     suspend fun getById(id: Long): IngestItem?
+
+    @Query("DELETE FROM ingest_items WHERE id = :id")
+    suspend fun delete(id: Long): Int
 }

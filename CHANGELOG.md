@@ -2,6 +2,19 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.2.2 / 4 (2026-08-25)
+
+**Diagnose-Build für den Share-Crash**
+
+Der Feldbefund bleibt: Beim Teilen aus fremden Apps schließt sich die App sofort, direkter Start funktioniert. Da die 0.2.1-Härtung des Empfangspfads nichts änderte, liegt der Crash offenbar außerhalb dieses Pfads (vermutlich Composition oder Activity-Start). Statt weiter zu raten: **dieser Build macht jeden Absturz sichtbar** (Sherpa-Diagnose-Pattern).
+
+- **CrashGuard:** Globaler Uncaught-Exception-Handler. Schreibt jeden Absturz in `files/crash/last_crash.txt` und zusätzlich als FAILED-Eintrag in die Outbox — der Befund überlebt den Prozesscrash.
+- **Info-Tab → Diagnose-Sektion:** Letzter Crash wird angezeigt und kann per Button in die Zwischenablage kopiert werden.
+- **Empfangs-Selbsttest** (Button im Info-Tab): Durchläuft denselben Codepfad wie ein echter Share (Intent bauen → Extraktion → Detektion → DB-Roundtrip) und liefert eine Ein-Zeilen-Diagnose.
+- Version 0.2.2 (versionCode 4).
+
+**Nächster Schritt nach Installation:** Teilen erneut versuchen → wenn Absturz: App normal öffnen → Info-Tab → „In Zwischenablage" + Selbsttest-Ergebnis schicken. Damit haben wir die exakte Ursache statt Vermutungen.
+
 ## 0.2.1 / 3 (2026-08-25)
 
 **Bugfix – Share-Empfang schloss sich sofort**
