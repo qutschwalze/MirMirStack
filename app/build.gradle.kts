@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
 }
 
@@ -27,8 +28,8 @@ android {
         applicationId = "com.heddrich.companion"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.2.3"
+        versionCode = 6
+        versionName = "0.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -46,11 +47,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // Stability-first: kein R8 – vermeidet komplette Klasse von
+            // Reflection-/Serializer-Problemen bei Retrofit/kotlinx.serialization.
+            isMinifyEnabled = false
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -106,4 +105,20 @@ dependencies {
     // Unit-Tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.room:room-testing:2.7.2")
+
+    // Netzwerk-Stack (Phase 2: BookStack-API)
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // WorkManager (Phase 2: Publish-Worker)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Verschlüsselte Secrets (Phase 2: Tokens/URLs)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // MockWebServer fuer Client-Tests
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }

@@ -17,6 +17,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.heddrich.companion.data.CompanionDatabase
 import com.heddrich.companion.inbox.InfoSection
 import com.heddrich.companion.inbox.InboxRoute
+import com.heddrich.companion.settings.SettingsRoute
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +59,12 @@ fun MainScaffold() {
             NavigationBarItem(
                 selected = tab == 1,
                 onClick = { tab = 1 },
+                icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                label = { Text("Einstellungen") }
+            )
+            NavigationBarItem(
+                selected = tab == 2,
+                onClick = { tab = 2 },
                 icon = { Icon(Icons.Default.Info, contentDescription = null) },
                 label = { Text("Info") }
             )
@@ -65,6 +73,8 @@ fun MainScaffold() {
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (tab == 0) {
                 InboxRoute()
+            } else if (tab == 1) {
+                SettingsRoute()
             } else {
                 InfoSection(versionLine)
             }

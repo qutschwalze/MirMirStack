@@ -2,6 +2,18 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.3.0 / 6 (2026-08-25)
+
+**Phase 2 – BookStack-Anbindung (Publish ohne LLM)**
+
+- **Einstellungen-Tab:** BookStack-URL, API-Token-ID/-Secret und Ziel-Buch-ID (Default 3 = „Meetings und Notizen"), verschlüsselt gespeichert via EncryptedSharedPreferences. Button „Speichern + Verbindung testen" prüft live gegen die API.
+- **BookStack-API-Client** (Retrofit + kotlinx.serialization): Monatskapitel sichern (`ensureMonthlyChapter`), Seite anlegen/updaten mit Idempotenz über den Seitennamen (gleicher Name = neue Revision statt Duplikat), Original als Attachment (Multipart-Feld `file` + `uploaded_to` — Pitfalls aus dem Bestandsskill eingebaut). Wiki-Link wird aus echten Slugs gebaut, nicht erraten.
+- **Publish-Worker** (WorkManager): Netzwerk-Constraint, exponentieller Backoff; nur Netzwerkfehler wiederholen sich automatisch, Konfigurationsfehler bleiben FAILED bis zur Nutzerkorrektur. Statuspflege QUEUED→RUNNING→DONE/FAILED in der Outbox.
+- **Inbox verdrahtet:** QUEUED/FAILED-Einträge antippen = Publish starten/wiederholen; DONE zeigt Button „Wiki-Seite öffnen" (echte Wiki-URL).
+- **Seitenformat:** Kapitel `YYYY-MM`, Seite `YYYY-MM-DD <Titel>`, HTML deterministisch aus dem Rohtext escapet (Phase 3 ersetzt das durch LLM-Zusammenfassungen).
+- Release-Builds jetzt ohne R8-Minify (stability-first: keine Reflection-/Serializer-Fallstricke).
+- Neue Tests: BookStack-Client gegen MockWebServer (Auth-Header, URL-Normalisierung, Kapitel-Idempotenz, Upsert-Pfade, Multipart-Semantik, Slug-URL) + Publisher-Unit-Tests (HTML-Escaping, Attachment-Namen). Insgesamt 15+11=26 Tests.
+
 ## 0.2.3 / 5 (2026-08-25)
 
 **Fix – Share-Crash-Ursache gefunden und behoben**

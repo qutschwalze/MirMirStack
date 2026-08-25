@@ -1,8 +1,11 @@
 package com.heddrich.companion.inbox
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -20,15 +24,20 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heddrich.companion.data.CompanionDatabase
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.heddrich.companion.data.IngestItem
 import com.heddrich.companion.data.IngestStatus
+import com.heddrich.companion.publish.PublishWorker
 import kotlinx.coroutines.flow.Flow
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Inbox-ViewModel: beobachtet die Outbox-Tabelle als Flow.
@@ -59,15 +68,11 @@ fun InboxScreen(items: List<IngestItem>) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
             ) {
-                Text(
-                    "Noch keine Eintraege.",
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                Text("Noch keine Eintraege.", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Teile Text oder eine Datei (md/txt/json) aus einer anderen App mit Companion.",
-                    style = MaterialTheme.typography.bodySmall,
-                    overflow = TextOverflow.Ellipsis
+                    "Teile Text oder eine Datei (md/txt/json) aus einer anderen App mit MirMirStack.",
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         } else {
@@ -75,7 +80,7 @@ fun InboxScreen(items: List<IngestItem>) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
+                contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(items, key = { it.id }) { item ->
@@ -88,8 +93,14 @@ fun InboxScreen(items: List<IngestItem>) {
 
 @Composable
 private fun IngestRow(item: IngestItem) {
+    val context = LocalContext.current
+
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = item.status == IngestStatus.QUEUED || item.status == IngestStatus.FAILED) {
+                PublishWorker.enqueue(context, item.id)
+            }
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -109,22 +120,13 @@ private fun IngestRow(item: IngestItem) {
                 AssistChip(onClick = {}, label = { Text(statusLabel(item.status)) })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    sourceLabelShort(item.sourceKind.name),
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Text(
-                    dateFormat(item.createdAt),
-                    style = MaterialTheme.typography.labelSmall
-                )
+                Text(sourceLabelShort(item.sourceKind.name), style = MaterialTheme.typography.labelSmall)
+                Text(dateFormat(item.createdAt), style = MaterialTheme.typography.labelSmall)
                 if (item.rawText != null) {
-                    Text(
-                        "${item.rawText.length} Zeichen",
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    Text("${item.rawText.length} Zeichen", style = MaterialTheme.typography.labelSmall)
                 }
             }
-            if (item.error != null) {
+            if (!item.error.isNullOrBlank()) {
                 Text(
                     item.error,
                     color = MaterialTheme.colorScheme.error,
@@ -133,16 +135,25 @@ private fun IngestRow(item: IngestItem) {
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            when (item.status) {
+                IngestStatus.DONE -> if (!item.resultUrl.isNullOrBlank()) {
+                    Button(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.resultUrl)))
+                    }) { Text("Wiki-Seite öffnen") }
+                }
+                IngestStatus.FAILED -> {
+                    Text(
+                        "Zum Wiederholen antippen",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                else -> {}
+            }
         }
     }
 }
 
-private fun statusLabel(s: IngestStatus): String = when (s) {
-    IngestStatus.QUEUED -> "QUEUED"
-    IngestStatus.RUNNING -> "RUNNING"
-    IngestStatus.DONE -> "DONE"
-    IngestStatus.FAILED -> "FAILED"
-}
+private fun statusLabel(s: IngestStatus): String = s.name
 
 private fun sourceLabelShort(kindName: String): String = when (kindName) {
     "SHERPA" -> "Sherpa"
@@ -155,4 +166,4 @@ private fun sourceLabelShort(kindName: String): String = when (kindName) {
 }
 
 private fun dateFormat(ts: Long): String =
-    java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(ts))
+    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(ts))
