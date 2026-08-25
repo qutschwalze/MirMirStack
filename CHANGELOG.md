@@ -2,6 +2,15 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.2.1 / 3 (2026-08-25)
+
+**Bugfix – Share-Empfang schloss sich sofort**
+
+- **Feldbefund (Gerätetest zu 0.2.0):** Beim Teilen aus anderen Apps schloss sich die App sofort wieder; direkter Start funktionierte.
+- **Gegenmaßnahme:** Der komplette Empfangspfad (Intent-Auswertung, Datei-Lesen, DB-Schreiben) läuft jetzt ausserhalb des Hauptthreads in einem einzigen abgesicherten Block. Jede Ausnahme wird abgefangen: Die App zeigt einen Fehlerbildschirm mit Meldung + Stacktrace und protokolliert den Fehler zusätzlich als FAILED-Eintrag in der Inbox – kein kommentarloses Verschwinden mehr.
+- Datei-Lesen jetzt gestreamt mit hartem Zeichenlimit (kein Voll-Laden grosser Dateien).
+- Umbenennung: App-Label heisst jetzt **MirMirStack** (Launcher + Sharesheet „Mit MirMirStack teilen"), passend zum Repo-Namen.
+
 ## 0.2.0 / 2 (2026-08-25)
 
 **Phase 1 – Share Target + Outbox**

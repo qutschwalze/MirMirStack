@@ -23,7 +23,7 @@
             android:name=".ShareActivity"
             android:exported="true"
             android:excludeFromRecents="true"
-            android:label="Teilen mit Companion"
+            android:label="Mit MirMirStack teilen"
             android:theme="@style/Theme.Companion">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
