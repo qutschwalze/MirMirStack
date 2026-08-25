@@ -45,8 +45,18 @@ class SummarizeWorker(
         val processed = try {
             process(item)
         } catch (e: Exception) {
+            // Verstaendliche Diagnose: HTTP-Code + Body-Auszug statt nur Klassenname
+            val reason = when (e) {
+                is retrofit2.HttpException -> {
+                    val body = try {
+                        e.response()?.errorBody()?.string().orEmpty().take(200)
+                    } catch (_: Exception) { "" }
+                    "LLM HTTP ${e.code()}: ${body.ifBlank { e.message().orEmpty().take(120) }}"
+                }
+                else -> "LLM: ${e.message?.take(200) ?: e.javaClass.simpleName}"
+            }
             dao.update(
-                item.copy(status = IngestStatus.FAILED, error = "LLM: ${e.message?.take(200)}")
+                item.copy(status = IngestStatus.FAILED, error = reason)
             )
             return if (runAttemptCount < MAX_ATTEMPTS && isTransient(e)) Result.retry() else Result.failure()
         }
@@ -123,6 +133,9 @@ class SummarizeWorker(
     }
 
     private fun isTransient(e: Exception): Boolean {
+        if (e is retrofit2.HttpException) {
+            return e.code() == 429 || e.code() in 500..599
+        }
         val m = e.message.orEmpty().lowercase()
         return m.contains("timeout") || m.contains("429") || m.contains("rate") ||
                 m.contains("unable to resolve host") || e is java.io.IOException

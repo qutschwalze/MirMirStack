@@ -139,9 +139,30 @@ suspend fun receiveSharedItem(
     try {
         val extracted = extractFromIntent(appContext.contentResolver, intent)
 
+        // PDF: Text extrahieren + Original byte-genau kopieren (Lossless-Prinzip;
+        // Share-URI-Berechtigungen laufen ab, die lokale Kopie bleibt).
+        var text = extracted.preview
+        var localPath: String? = null
+        if (extracted.isPdf && extracted.rawUri != null) {
+            val pdfUri = android.net.Uri.parse(extracted.rawUri)
+            localPath = PdfSupport.copyOriginal(appContext, pdfUri)
+            if (text.isNullOrBlank()) {
+                text = PdfSupport.extractText(appContext, pdfUri)
+                if (text.isNullOrBlank()) {
+                    return failState(
+                        appContext = appContext,
+                        referrerHost = referrerHost,
+                        message = "PDF enthaelt keinen extrahierbaren Text (moeglicherweise ein Scan ohne Textebene).",
+                        stack = "",
+                        extracted = extracted
+                    )
+                }
+            }
+        }
+
         val pkg = referrerHost
             ?: extracted.rawUri?.let { runCatching { Uri.parse(it).authority }.getOrNull() }
-        val kind = SourceDetector.detect(pkg, extracted.preview?.take(600))
+        val kind = SourceDetector.detect(pkg, text?.take(600))
 
         val item = IngestItem(
             createdAt = System.currentTimeMillis(),
@@ -149,18 +170,19 @@ suspend fun receiveSharedItem(
             sourceKind = kind,
             // Vorauswahl nach Quelle: Sherpa->Meeting, Browser->Recherche, Chat->Digest
             templateId = com.heddrich.companion.llm.Templates.defaultFor(kind.name),
-            title = suggestTitle(extracted.preview.orEmpty()),
-            rawText = extracted.preview,
+            title = suggestTitle(text.orEmpty()),
+            rawText = text,
             rawUri = extracted.rawUri,
             mime = extracted.mime,
             status = IngestStatus.QUEUED,
             error = extracted.warning,
-            resultUrl = null
+            resultUrl = null,
+            rawLocalPath = localPath
         )
         val id = CompanionDatabase.get(appContext).ingestItemDao().insert(item)
         return ShareLoadState.Ready(
             itemId = id,
-            preview = extracted.preview.orEmpty(),
+            preview = text.orEmpty(),
             mime = extracted.mime,
             rawUri = extracted.rawUri,
             sourcePkg = pkg,
@@ -168,38 +190,55 @@ suspend fun receiveSharedItem(
             warning = extracted.warning
         )
     } catch (t: Throwable) {
-        val msg = (t.message ?: t.javaClass.simpleName)
-        val stack = t.stackTraceToString().take(1500)
-        // Best effort: Fehlerfall dauerhaft sichtbar machen (Inbox zeigt FAILED + Stack)
-        val persisted = try {
-            CompanionDatabase.get(appContext).ingestItemDao().insert(
-                IngestItem(
-                    createdAt = System.currentTimeMillis(),
-                    sourcePkg = referrerHost,
-                    sourceKind = SourceDetector.detect(referrerHost, null),
-                    templateId = null,
-                    title = "FEHLER beim Empfang ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())}",
-                    rawText = null,
-                    rawUri = null,
-                    mime = null,
-                    status = IngestStatus.FAILED,
-                    error = "$msg\n$stack",
-                    resultUrl = null
-                )
-            )
-            true
-        } catch (_: Throwable) {
-            false
-        }
-        return ShareLoadState.Failed(msg, stack, persisted)
+        return failState(
+            appContext, referrerHost,
+            t.message ?: t.javaClass.simpleName,
+            stack = t.stackTraceToString().take(1200),
+            extracted = null
+        )
     }
+}
+
+/** Baut den Failed-Zustand inkl. dauerhaftem FAILED-Eintrag in der Outbox. */
+private suspend fun failState(
+    appContext: Context,
+    referrerHost: String?,
+    message: String,
+    stack: String,
+    extracted: Extracted?
+): ShareLoadState.Failed {
+    val persisted = try {
+        CompanionDatabase.get(appContext).ingestItemDao().insert(
+            IngestItem(
+                createdAt = System.currentTimeMillis(),
+                sourcePkg = referrerHost,
+                sourceKind = SourceDetector.detect(referrerHost, null),
+                templateId = null,
+                title = "FEHLER beim Empfang ${
+                    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+                }",
+                rawText = null,
+                rawUri = extracted?.rawUri,
+                mime = extracted?.mime,
+                status = IngestStatus.FAILED,
+                error = listOfNotNull(message.take(300), stack.ifBlank { null })
+                    .joinToString("\n").ifBlank { null },
+                resultUrl = null
+            )
+        )
+        true
+    } catch (_: Throwable) {
+        false
+    }
+    return ShareLoadState.Failed(message, stack, persisted)
 }
 
 internal data class Extracted(
     val preview: String?,
     val mime: String?,
     val rawUri: String?,
-    val warning: String?
+    val warning: String?,
+    val isPdf: Boolean = false
 )
 
 internal fun extractFromIntent(resolver: android.content.ContentResolver, intent: Intent?): Extracted {
@@ -208,13 +247,18 @@ internal fun extractFromIntent(resolver: android.content.ContentResolver, intent
     var uri: Uri? = null
     var mime: String? = intent.type
     var warning: String? = null
+    var isPdf = false
 
     when (intent.action) {
         Intent.ACTION_SEND -> {
             text = intent.getStringExtra(Intent.EXTRA_TEXT)
             @Suppress("DEPRECATION")
             uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-            if (text == null && uri != null) {
+            if (uri != null &&
+                (mime?.contains("pdf", true) == true || uri.toString()?.endsWith(".pdf") == true)
+            ) {
+                isPdf = true // Text kommt spaeter aus der PDF-Extraktion
+            } else if (text == null && uri != null) {
                 val limited = readTextLimited(resolver, uri)
                 text = limited.text
                 warning = limited.warning
@@ -225,16 +269,20 @@ internal fun extractFromIntent(resolver: android.content.ContentResolver, intent
             val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
             if (!uris.isNullOrEmpty()) {
                 uri = uris.first() // Phase 1: erste Datei genuegt
-                val limited = readTextLimited(resolver, uri)
-                text = limited.text
-                warning = limited.warning
+                if (mime?.contains("pdf", true) == true || uri.toString().endsWith(".pdf")) {
+                    isPdf = true
+                } else {
+                    val limited = readTextLimited(resolver, uri)
+                    text = limited.text
+                    warning = limited.warning
+                }
             }
         }
     }
-    if (text != null && text.length > MAX_INGEST_CHARS) {
+    if (!isPdf && text != null && text.length > MAX_INGEST_CHARS) {
         text = text.substring(0, MAX_INGEST_CHARS)
     }
-    return Extracted(text, mime, uri?.toString(), warning)
+    return Extracted(text, mime, uri?.toString(), warning, isPdf)
 }
 
 /** Liest Text gestreamt mit Zeichenlimit (kein Voll-Laden grosser Dateien mehr). */
@@ -396,11 +444,18 @@ private fun ShareEditor(s: ShareLoadState.Ready) {
                 Button(
                     onClick = {
                         scope.launch {
-                            withContext(Dispatchers.IO) {
-                                dao.getById(s.itemId)?.let {
+                            val id = withContext(Dispatchers.IO) {
+                                val existing = dao.getById(s.itemId)
+                                existing?.let {
                                     dao.update(it.copy(title = title, templateId = templateId))
                                 }
+                                s.itemId
                             }
+                            // Auto-Start: Nach dem Speichern sofort verarbeiten,
+                            // kein manuelles Antippen in der Inbox noetig.
+                            com.heddrich.companion.publish.SummarizeWorker.enqueue(
+                                context.applicationContext, id
+                            )
                             (context as? android.app.Activity)?.finishAffinity()
                         }
                     }

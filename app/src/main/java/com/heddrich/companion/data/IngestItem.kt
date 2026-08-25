@@ -29,5 +29,7 @@ data class IngestItem(
     /** Wiki-URL nach erfolgreichem Publish (Phase 2). */
     val resultUrl: String?,
     /** Markdown-Zusammenfassung aus dem LLM-Pfad (Phase 3). */
-    val summaryMd: String? = null
+    val summaryMd: String? = null,
+    /** Lokale Lossless-Kopie des Originals (z. B. PDF), falls vorhanden. */
+    val rawLocalPath: String? = null
 )

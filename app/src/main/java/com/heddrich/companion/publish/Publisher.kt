@@ -70,10 +70,16 @@ object Publisher {
                 html = html
             )
 
-            // 3) Original als Attachment (aus der Outbox, nicht von der Share-URI –
-            //    deren Berechtigung laeuft ab; die Outbox ist unsere verlustfreie Kopie)
+            // 3) Original als Attachment – bevorzugt die byte-genue Lossless-Kopie
+            //    (PDF), sonst den Text aus der Outbox
             runCatching {
-                client.uploadAttachment(page.id, attachmentName(item), item.rawText.orEmpty())
+                val localPath = item.rawLocalPath
+                val localFile = localPath?.let { java.io.File(it) }
+                if (localFile != null && localFile.exists()) {
+                    client.uploadAttachmentFile(page.id, attachmentName(item), localFile)
+                } else {
+                    client.uploadAttachment(page.id, attachmentName(item), item.rawText.orEmpty())
+                }
             }
 
             PublishResult.Success(

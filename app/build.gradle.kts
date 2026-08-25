@@ -28,8 +28,8 @@ android {
         applicationId = "com.heddrich.companion"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.4.2"
+        versionCode = 11
+        versionName = "0.4.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -121,4 +121,7 @@ dependencies {
     // MockWebServer fuer Client-Tests
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
+    // PDF-Textextraktion (Phase: PDF-Support)
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 }

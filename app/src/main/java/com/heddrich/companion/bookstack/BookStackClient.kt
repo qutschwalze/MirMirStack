@@ -6,6 +6,7 @@ import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -125,6 +126,16 @@ class BookStackClient internal constructor(
     suspend fun uploadAttachment(pageId: Int, fileName: String, content: String): AttachmentDto {
         val body = content.toByteArray(Charsets.UTF_8)
             .toRequestBody("text/markdown".toMediaType())
+        val part = MultipartBody.Part.createFormData("file", fileName, body)
+        val uploadedTo = pageId.toString().toPlainPart()
+        val name = fileName.toPlainPart()
+        return api.createAttachment(part, uploadedTo, name)
+    }
+
+    /** Binärsichere Variante fuer lokale Dateien (z. B. PDF-Lossless-Kopie). */
+    suspend fun uploadAttachmentFile(pageId: Int, fileName: String, file: java.io.File): AttachmentDto {
+        val mime = if (fileName.endsWith(".pdf", true)) "application/pdf" else "application/octet-stream"
+        val body = file.asRequestBody(mime.toMediaType())
         val part = MultipartBody.Part.createFormData("file", fileName, body)
         val uploadedTo = pageId.toString().toPlainPart()
         val name = fileName.toPlainPart()

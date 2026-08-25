@@ -2,6 +2,16 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.4.3 / 11 (2026-08-25)
+
+**PDF-Support, Auto-Start, klarere LLM-Fehler**
+
+- **PDF geteilt → verarbeitet:** Share Target akzeptiert jetzt zusätzlich `application/pdf`. Text wird lokal per PDFBox extrahiert (max. 80 Seiten), das Original wird byte-genau in der App-Kopie bewahrt und als echtes PDF-Attachment hochgeladen (statt Text). Scans ohne Textebene erzeugen eine klare Fehlermeldung statt eines stillen Fehlschlags.
+- **Auto-Start:** Nach „Speichern" im Share-Screen startet die Verarbeitung sofort (QUEUED→RUNNING) — kein manuelles Antippen mehr nötig.
+- **LLM-Fehldiagnose:** FAILED-Einträge zeigen jetzt HTTP-Code + Response-Auszug (z. B. „LLM HTTP 429: …"), und 429/5xx werden automatisch mit Backoff wiederholt.
+- Markierter Text aus anderen Apps war bereits möglich (normales Teilen von `text/plain`) — funktioniert unverändert.
+- Room-Migration v3 (`rawLocalPath`).
+
 ## 0.4.2 / 10 (2026-08-25)
 
 **UX – Publish-Gefühlsgeschwindigkeit + Doppelstart-Schutz**
