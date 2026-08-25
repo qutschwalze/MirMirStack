@@ -23,6 +23,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.heddrich.companion.data.CompanionDatabase
 import com.heddrich.companion.data.IngestItem
 import com.heddrich.companion.data.IngestStatus
+import com.heddrich.companion.settings.SettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -96,7 +98,10 @@ class ShareActivity : ComponentActivity() {
         val shareIntent = intent
 
         setContent {
-            MaterialTheme {
+            val appTheme = com.heddrich.companion.ui.ThemeMode.fromString(
+                SettingsStore.Holder.get(applicationContext).themeMode
+            )
+            com.heddrich.companion.ui.CompanionTheme(appTheme) {
                 ShareRoot(shareIntent, referrerHost)
             }
         }
@@ -142,7 +147,8 @@ suspend fun receiveSharedItem(
             createdAt = System.currentTimeMillis(),
             sourcePkg = pkg,
             sourceKind = kind,
-            templateId = null,
+            // Vorauswahl nach Quelle: Sherpa->Meeting, Browser->Recherche, Chat->Digest
+            templateId = com.heddrich.companion.llm.Templates.defaultFor(kind.name),
             title = suggestTitle(extracted.preview.orEmpty()),
             rawText = extracted.preview,
             rawUri = extracted.rawUri,
@@ -321,6 +327,9 @@ private fun ShareEditor(s: ShareLoadState.Ready) {
     }
 
     var title by remember { mutableStateOf(suggestTitle(s.preview)) }
+    var templateId by remember {
+        mutableStateOf(com.heddrich.companion.llm.Templates.defaultFor(s.sourceKind.name))
+    }
 
     Scaffold(
         topBar = {
@@ -368,13 +377,29 @@ private fun ShareEditor(s: ShareLoadState.Ready) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+            // Vorlagenwahl (Vorauswahl kam aus der Quell-Erkennung)
+            Text("Vorlage", style = MaterialTheme.typography.labelLarge)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                com.heddrich.companion.llm.Templates.all().forEach { t ->
+                    FilterChip(
+                        selected = templateId == t.id,
+                        onClick = { templateId = t.id },
+                        label = { Text(t.displayName) }
+                    )
+                }
+            }
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     onClick = {
                         scope.launch {
                             withContext(Dispatchers.IO) {
-                                dao.getById(s.itemId)?.let { dao.update(it.copy(title = title)) }
+                                dao.getById(s.itemId)?.let {
+                                    dao.update(it.copy(title = title, templateId = templateId))
+                                }
                             }
                             (context as? android.app.Activity)?.finishAffinity()
                         }
@@ -389,7 +414,12 @@ private fun ShareEditor(s: ShareLoadState.Ready) {
                 }
             }
             Text(
-                "Gespeichert in der lokalen Outbox – Verarbeitung folgt in Phase 2.",
+                if (com.heddrich.companion.settings.SettingsStore.Holder
+                        .get(context.applicationContext).isLlmConfigured
+                )
+                    "Wird mit KI zusammengefasst und nach BookStack publiziert."
+                else
+                    "Keine KI konfiguriert – Rohtext wird direkt nach BookStack publiziert.",
                 style = MaterialTheme.typography.labelSmall
             )
         }

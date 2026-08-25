@@ -2,6 +2,20 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.4.0 / 8 (2026-08-25)
+
+**Phase 3 – LLM-Zusammenfassungen + Theme-Umschalter**
+
+- **KI-Pipeline:** Geteilte Inhalte werden jetzt per OpenAI-kompatiblem Endpoint zusammengefasst (Gemini-OpenAI-Endpoint u. a. funktionieren). Erzwungenes JSON (`title`, `summary_md`, `decisions`, `todos`, `participants`, `tags`), toleranter Parser (Codefences/Prosa drumherum ok), Pflichtfeld-Validierung — bei Fehlern FAILED mit klarer Meldung statt Müll ins Wiki.
+- **Deterministisches HTML:** Die App rendert die Markdown-Zusammenfassung selbst (Golden-Tests) — nie LLM-Rohtml im Wiki. Entscheidungen und To-dos als eigene Abschnitte, Teilnehmer als Zeile.
+- **Vorlagen:** Meeting-Protokoll / Recherche-Clip / Chat-Digest / Universal. Vorauswahl automatisch nach Quelle (Sherpa→Meeting, Browser→Recherche, WhatsApp→Chat), im Share-Screen per Chip änderbar.
+- **LLM-Titel übernimmt:** Der Auto-Titel („mitten im Satz"-Problem aus Phase 2) wird durch den KI-Titel ersetzt.
+- **Fallback ohne KI:** Kein LLM konfiguriert → Rohtext-Seite wie in Phase 2; Pipeline steht nie still.
+- **Theme-Umschalter:** Hell / System / Dunkel im Einstellungen-Tab, sofort wirksam, gespeichert; gilt auch im Share-Screen.
+- **Einstellungen erweitert:** LLM-Basis-URL (inkl. `/v1/`), API-Key, Modellname + „KI testen"-Button.
+- Room-Migration v2 (`templateId`, `summaryMd`); Worker-Kette PROCESS→PUBLISH mit Transient-Fehler-Retry.
+- Neue Tests: Parser (Codefence, Prosa, Pflichtfelder), MD-Renderer-Golden-Tests, Template-Routing — insgesamt 44.
+
 ## 0.3.1 / 7 (2026-08-25)
 
 **Diagnose für den 403 beim Verbindungstest**

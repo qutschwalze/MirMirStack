@@ -28,14 +28,24 @@ object Publisher {
     const val CHAPTER_FORMAT = "yyyy-MM"
 
     suspend fun publish(appContext: Context, item: IngestItem): PublishResult {
+        val rawText = item.rawText.orEmpty()
+        val html = "<p>" +
+                escapeHtml(rawText.take(50_000)).replace("\n", "<br>") +
+                "</p>"
+        return publishHtml(appContext, item, html)
+    }
+
+    /**
+     * Publiziert bereits gerendertes HTML (aus dem LLM-Pfad oder Rohtext-Fallback).
+     */
+    suspend fun publishHtml(appContext: Context, item: IngestItem, html: String): PublishResult {
         val settings = SettingsStore.Holder.get(appContext)
         if (!settings.isConfigured) {
             return PublishResult.Failure(
                 "BookStack nicht konfiguriert (URL/Token fehlen) – erst in den Einstellungen setzen."
             )
         }
-        val rawText = item.rawText
-        if (rawText.isNullOrBlank()) {
+        if (item.rawText.isNullOrBlank()) {
             return PublishResult.Failure("Kein Inhalt zum Publizieren vorhanden.")
         }
 
@@ -57,12 +67,14 @@ object Publisher {
             val (page, created) = client.upsertPage(
                 chapterId = chapter.id,
                 name = pageTitle,
-                html = escapeHtml(rawText.take(50_000))
+                html = html
             )
 
             // 3) Original als Attachment (aus der Outbox, nicht von der Share-URI –
             //    deren Berechtigung laeuft ab; die Outbox ist unsere verlustfreie Kopie)
-            runCatching { client.uploadAttachment(page.id, attachmentName(item), rawText) }
+            runCatching {
+                client.uploadAttachment(page.id, attachmentName(item), item.rawText.orEmpty())
+            }
 
             PublishResult.Success(
                 wikiUrl = client.webUrlFor(page),

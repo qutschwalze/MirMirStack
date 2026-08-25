@@ -33,7 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.heddrich.companion.data.IngestItem
 import com.heddrich.companion.data.IngestStatus
-import com.heddrich.companion.publish.PublishWorker
+import com.heddrich.companion.publish.SummarizeWorker
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -99,7 +99,7 @@ private fun IngestRow(item: IngestItem) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = item.status == IngestStatus.QUEUED || item.status == IngestStatus.FAILED) {
-                PublishWorker.enqueue(context, item.id)
+                SummarizeWorker.enqueue(context, item.id)
             }
     ) {
         Column(

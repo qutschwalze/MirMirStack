@@ -5,20 +5,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Inbox
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,23 +28,38 @@ import com.heddrich.companion.data.CompanionDatabase
 import com.heddrich.companion.inbox.InfoSection
 import com.heddrich.companion.inbox.InboxRoute
 import com.heddrich.companion.settings.SettingsRoute
+import com.heddrich.companion.settings.SettingsStore
+import com.heddrich.companion.ui.CompanionTheme
+import com.heddrich.companion.ui.ThemeMode
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val settings = SettingsStore.Holder.get(applicationContext)
         setContent {
-            MaterialTheme {
-                MainScaffold()
+            var appTheme by remember {
+                mutableStateOf(ThemeMode.fromString(settings.themeMode))
+            }
+            CompanionTheme(appTheme) {
+                MainScaffold(
+                    versionLine = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    onThemeChanged = { mode ->
+                        appTheme = mode
+                        settings.themeMode = mode.name
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun MainScaffold() {
+fun MainScaffold(
+    versionLine: String,
+    onThemeChanged: (ThemeMode) -> Unit
+) {
     var tab by remember { mutableStateOf(0) }
-    val versionLine = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
 
     Scaffold(bottomBar = {
         NavigationBar {
@@ -74,7 +87,7 @@ fun MainScaffold() {
             if (tab == 0) {
                 InboxRoute()
             } else if (tab == 1) {
-                SettingsRoute()
+                SettingsRoute(onThemeChanged = onThemeChanged)
             } else {
                 InfoSection(versionLine)
             }

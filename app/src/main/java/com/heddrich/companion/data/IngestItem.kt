@@ -27,5 +27,7 @@ data class IngestItem(
     val status: IngestStatus,
     val error: String?,
     /** Wiki-URL nach erfolgreichem Publish (Phase 2). */
-    val resultUrl: String?
+    val resultUrl: String?,
+    /** Markdown-Zusammenfassung aus dem LLM-Pfad (Phase 3). */
+    val summaryMd: String? = null
 )

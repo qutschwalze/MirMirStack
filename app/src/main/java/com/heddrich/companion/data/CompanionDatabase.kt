@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 
 @Database(
     entities = [IngestItem::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -26,7 +26,9 @@ abstract class CompanionDatabase : RoomDatabase() {
                     context.applicationContext,
                     CompanionDatabase::class.java,
                     "companion.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .addMigrations(*Migrations.ALL)
+                    .build().also { INSTANCE = it }
             }
 
         /**
