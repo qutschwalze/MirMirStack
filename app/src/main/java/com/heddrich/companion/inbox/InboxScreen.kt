@@ -100,7 +100,8 @@ private fun IngestRow(item: IngestItem) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = item.status == IngestStatus.QUEUED || item.status == IngestStatus.FAILED) {
-                SummarizeWorker.enqueue(context, item.id)
+                // force: stehengebliebene Unique-Work-Eintraege ueberschreiben
+                SummarizeWorker.enqueue(context, item.id, force = true)
             }
     ) {
         Column(

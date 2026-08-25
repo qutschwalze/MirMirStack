@@ -23,4 +23,10 @@ interface IngestItemDao {
 
     @Query("DELETE FROM ingest_items WHERE id = :id")
     suspend fun delete(id: Long): Int
+
+    /** Hängengebliebene Aufträge: gespeichert, aber nie verarbeitet worden. */
+    @Query(
+        "SELECT * FROM ingest_items WHERE status = 'QUEUED' AND templateId IS NOT NULL"
+    )
+    suspend fun queuedSubmitted(): List<IngestItem>
 }

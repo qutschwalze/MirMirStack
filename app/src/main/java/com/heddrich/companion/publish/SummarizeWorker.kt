@@ -154,7 +154,12 @@ class SummarizeWorker(
     companion object {
         const val MAX_ATTEMPTS = 3
 
-        fun enqueue(context: Context, itemId: Long) {
+        /**
+         * force=false: Laufender Job bleibt unberuehrt (KEEP) – fuer Auto-Start.
+         * force=true: Bricht einen haengenden/stehengebliebenen Eintrag ab und
+         * startet neu (REPLACE) – fuer manuelles Antippen und Start-Sweep.
+         */
+        fun enqueue(context: Context, itemId: Long, force: Boolean = false) {
             val request = OneTimeWorkRequestBuilder<SummarizeWorker>()
                 .setInputData(workDataOf(PublishWorker.KEY_ITEM_ID to itemId))
                 .setConstraints(
@@ -166,10 +171,7 @@ class SummarizeWorker(
                 .build()
             androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
                 "summarize-$itemId",
-                // KEEP statt REPLACE: erneutes Antippen waehrend eines Laufs startet
-                // NICHT neu (kein doppelter LLM-Call); nach FAILED ist die alte
-                // Arbeit beendet, ein neuer Lauf ist weiterhin moeglich.
-                ExistingWorkPolicy.KEEP,
+                if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
                 request
             )
         }

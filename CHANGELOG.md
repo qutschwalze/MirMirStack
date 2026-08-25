@@ -2,6 +2,16 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.4.5 / 13 (2026-08-25)
+
+**Fix – „Unterbrochen, wird fortgesetzt" blieb für immer hängen**
+
+Feldbefund: Nach 0.4.4 zeigte das Item korrekt „Unterbrochen – wird automatisch fortgesetzt", aber es passierte nichts — Antippen brachte auch nichts.
+
+- **Ursache 1:** Der abgebrochene Job lag noch als Eintrag in der WorkManager-Queue; das Antippen lief mit Policy KEEP und wurde daher **stillschweigend verworfen**.
+- **Ursache 2:** Bei Force-Stop der App hält Android WorkManager-Jobs an, bis die App wieder geöffnet wird — „automatisch fortsetzen" funktioniert dann erst beim nächsten echten App-Start.
+- **Fixe:** Antippen startet jetzt mit REPLACE (überschreibt verwaiste Queue-Einträge); beim App-Start sweeped eine Recovery-Routine alle hängengebliebenen QUEUED-Einträge und reiht sie force-neu ein.
+
 ## 0.4.4 / 12 (2026-08-25)
 
 **Fix – „LLM canceled" nach App-Schließen**
