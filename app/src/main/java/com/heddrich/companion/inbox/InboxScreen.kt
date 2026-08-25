@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -140,6 +141,13 @@ private fun IngestRow(item: IngestItem) {
                     Button(onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.resultUrl)))
                     }) { Text("Wiki-Seite öffnen") }
+                }
+                IngestStatus.RUNNING -> {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text(
+                        "KI-Zusammenfassung läuft, danach Publikation ins Wiki (typisch 10–20 s)…",
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
                 IngestStatus.FAILED -> {
                     Text(

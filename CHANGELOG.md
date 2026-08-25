@@ -2,6 +2,18 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.4.2 / 10 (2026-08-25)
+
+**UX – Publish-Gefühlsgeschwindigkeit + Doppelstart-Schutz**
+
+Feldbefund: Erstellung wirkt „sehr lahm". Benchmark gegen den Live-Endpoint zeigt: Der LLM ist schnell (36.000-Zeichen-Transkript in 4,3 s) — die wahrgenommene Zeit entsteht aus Warteschlangen-Latenz, unsichtbarem Fortschritt und versehentlichen Doppel-Taps:
+
+- **Expedited-Ausführung**: WorkManager führt den Job sofort aus statt ihn in die reguläre Warteschlange zu stellen.
+- **KEEP statt REPLACE**: Antippen während eines laufenden Jobs startet ihn nicht mehr neu (kein doppelter LLM-Call); nach FAILED ist weiterhin ein Neustart möglich.
+- **Sichtbarer Fortschritt**: RUNNING-Einträge zeigen Progress-Bar + Hinweistext („typisch 10–20 s").
+
+Serverseitige Verifikation des Phase-3-Ergebnisses: Seiten mit sauberem KI-Titel, strukturiertem HTML (To-dos/Listen/Teilnehmer), je einem Original-Attachment, keine Duplikate.
+
 ## 0.4.1 / 9 (2026-08-25)
 
 **Hotfix – App starb nach 2 Sekunden beim Start (0.4.0)**

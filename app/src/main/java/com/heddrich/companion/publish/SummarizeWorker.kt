@@ -137,11 +137,16 @@ class SummarizeWorker(
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 )
+                // Expedited = sofortige Ausfuehrung statt Warteschlangen-Latenz
+                .setExpedited(androidx.work.OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
             androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
                 "summarize-$itemId",
-                ExistingWorkPolicy.REPLACE,
+                // KEEP statt REPLACE: erneutes Antippen waehrend eines Laufs startet
+                // NICHT neu (kein doppelter LLM-Call); nach FAILED ist die alte
+                // Arbeit beendet, ein neuer Lauf ist weiterhin moeglich.
+                ExistingWorkPolicy.KEEP,
                 request
             )
         }
