@@ -96,9 +96,18 @@ fun SettingsRoute() {
                 scope.launch {
                     message = withContext(Dispatchers.IO) {
                         try {
-                            BookStackClient.testConnection(settings)
+                            "OK – " + BookStackClient.testConnection(settings)
+                        } catch (e: retrofit2.HttpException) {
+                            // Response-Body zeigen: unterscheidet BookStack-Berechtigungs-
+                            // fehler (JSON) von Proxy-/WAF-Blockierungen (HTML)
+                            val body = try {
+                                e.response()?.errorBody()?.string().orEmpty().take(220)
+                            } catch (_: Exception) { "" }
+                            "HTTP ${e.code()}: ${body.ifBlank { "(kein Body)" }}\n" +
+                                    "URL: ${BookStackClient.normalizeBaseUrl(settings.bookstackUrl)}"
                         } catch (e: Exception) {
-                            "FEHLER: ${e.message ?: e.javaClass.simpleName}"
+                            "FEHLER: ${e.message ?: e.javaClass.simpleName}\n" +
+                                    "URL: ${BookStackClient.normalizeBaseUrl(settings.bookstackUrl)}"
                         }
                     }
                     testing = false

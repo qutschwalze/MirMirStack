@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.3.1 / 7 (2026-08-25)
+
+**Diagnose für den 403 beim Verbindungstest**
+
+- Feldbefund: Nach Token-Eintrag meldet der Verbindungstest HTTP 403. Host-seitige Verifikation zeigt: korrekte Credentials liefern 200 (auch mit okhttp-UA), falsche/vertauschte liefern stets **401** mit klarer Meldung — ein 403 kommt also entweder von BookStack-Berechtigungen (Token-User ohne API-Rechte) oder von einem Proxy/WAF zwischen Handy und Server.
+- Verbindungstest zeigt jetzt **HTTP-Code + Response-Body-Auszug + normalisierte URL** — der nächste Versuch liefert die exakte Ursache statt nur eines Codes.
+- Version 0.3.1 (versionCode 7).
+
 ## 0.3.0 / 6 (2026-08-25)
 
 **Phase 2 – BookStack-Anbindung (Publish ohne LLM)**
