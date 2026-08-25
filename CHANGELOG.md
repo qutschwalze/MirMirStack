@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.2.3 / 5 (2026-08-25)
+
+**Fix – Share-Crash-Ursache gefunden und behoben**
+
+- **Root Cause (via CrashGuard 0.2.2 verifiziert):** `ClassNotFoundException` beim Start der ShareActivity. Die Klasse liegt im Paket `com.heddrich.companion.share`, das Manifest verwies aber auf `com.heddrich.companion.ShareActivity`. Beim Teilen versuchte Android, die nicht existierende Klasse per Reflection zu laden — Instant-Crash vor jeder eigenen Codezeile. Erklärt alle Befunde seit 0.2.0: direkter Start funktionierte (MainActivity-Pfad korrekt), Teilen crashte sofort, Unit-Tests blieben grün.
+- **Fix:** Manifest-Eintrag korrigiert auf `.share.ShareActivity`.
+- CrashGuard + Diagnose-Sektion + Selbsttest bleiben dauerhaft im Build (früher Befund, schneller Fix).
+
 ## 0.2.2 / 4 (2026-08-25)
 
 **Diagnose-Build für den Share-Crash**

@@ -20,7 +20,7 @@
 
         <!-- Share Target: Text (text/plain, Markdown, ...) und JSON-Dateien -->
         <activity
-            android:name=".ShareActivity"
+            android:name=".share.ShareActivity"
             android:exported="true"
             android:excludeFromRecents="true"
             android:label="Mit MirMirStack teilen"
