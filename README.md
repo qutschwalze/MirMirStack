@@ -13,7 +13,15 @@ Share anything — meeting transcripts, browser text, chat messages, Markdown/JS
 
 ### Status
 
-Phase 0 — project scaffold. The app builds, runs and shows its version. Functionality arrives phase by phase (see roadmap); every version is tagged and released here with debug + release APKs.
+Phase 1 — share target + local outbox. Content shared from any app (text, Markdown, JSON files) lands losslessly in the local outbox; source detection identifies the sending app via share-sheet referrer plus content heuristics. Publishing to BookStack arrives with Phase 2.
+
+### What works (as of 0.2.0)
+
+- Share into the app from anywhere: `ACTION_SEND` / `ACTION_SEND_MULTIPLE` for `text/*` and `application/json`
+- Lossless capture: item is written to the Room outbox immediately on receipt (2 MB cap per item)
+- Source detection: referrer-based (Chrome, Firefox, WhatsApp, Gmail, Sherpa Transcript, ...) with content heuristics as fallback (speaker markers → transcript, URL lists → browser); covered by 15 unit tests
+- Inbox list with status badges (QUEUED / RUNNING / DONE / FAILED), source, size, error display
+- Signed release builds via separate project keystore
 
 ### Roadmap
 
@@ -66,7 +74,15 @@ Not applicable yet (arrives with Phase 2): BookStack base URL + API token, LLM b
 
 ### Status
 
-Phase 0 — Projektgerüst. Die App baut, startet und zeigt ihre Version. Die Funktionalität kommt phasenweise (siehe Roadmap); jede Version wird hier getaggt und mit Debug- und Release-APK released.
+Phase 1 — Share Target + lokale Outbox. Aus beliebigen Apps geteilte Inhalte (Text, Markdown, JSON-Dateien) landen verlustfrei in der lokalen Outbox; die Quellenerkennung identifiziert die sendende App per Referrer plus Inhaltsheuristik. Die Anbindung an BookStack kommt mit Phase 2.
+
+### Funktionen (ab 0.2.0)
+
+- Teilen aus jeder App: `ACTION_SEND` / `ACTION_SEND_MULTIPLE` fuer `text/*` und `application/json`
+- Verlustfreier Empfang: Das Element wird sofort beim Empfang in der Room-Outbox gespeichert (2 MB Limit pro Element)
+- Quellenerkennung: Referrer-basiert (Chrome, Firefox, WhatsApp, Gmail, Sherpa Transcript, ...) mit Inhaltsheuristik als Fallback (Sprecher-Marker → Transkript, URL-Listen → Browser); 15 Unit-Tests
+- Inbox-Liste mit Status-Badges (QUEUED / RUNNING / DONE / FAILED), Quelle, Groesse, Fehleranzeige
+- Signierte Release-Builds ueber eigenen Projekt-Keystore
 
 ### Roadmap
 

@@ -4,54 +4,86 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.heddrich.companion.data.CompanionDatabase
+import com.heddrich.companion.inbox.InboxRoute
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme()) {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    HelloScreen(Modifier.padding(innerPadding))
-                }
+            MaterialTheme {
+                MainScaffold()
             }
         }
     }
 }
 
 @Composable
-fun HelloScreen(modifier: Modifier = Modifier) {
+fun MainScaffold() {
+    var tab by remember { mutableStateOf(0) }
+    val versionLine = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+
+    Scaffold(bottomBar = {
+        NavigationBar {
+            NavigationBarItem(
+                selected = tab == 0,
+                onClick = { tab = 0 },
+                icon = { Icon(Icons.Default.Inbox, contentDescription = null) },
+                label = { Text("Inbox") }
+            )
+            NavigationBarItem(
+                selected = tab == 1,
+                onClick = { tab = 1 },
+                icon = { Icon(Icons.Default.Info, contentDescription = null) },
+                label = { Text("Info") }
+            )
+        }
+    }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (tab == 0) {
+                InboxRoute()
+            } else {
+                InfoTab(versionLine)
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoTab(versionLine: String) {
     Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
     ) {
-        Text("Companion", style = MaterialTheme.typography.headlineMedium)
+        Text("MirMirStack", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))
-        Text(
-            "Share Target -> BookStack",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
-        )
+        Text("Share Target -> BookStack", style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(24.dp))
-        Text(
-            "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-            style = MaterialTheme.typography.labelMedium
-        )
+        Text(versionLine, style = MaterialTheme.typography.labelMedium)
     }
 }
