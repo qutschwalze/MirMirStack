@@ -73,6 +73,31 @@ class SettingsStore private constructor(context: Context) {
         get() = prefs.getInt(K_CONFIG_PAGE, 0)
         set(v) = prefs.edit().putInt(K_CONFIG_PAGE, v).apply()
 
+    // ── Server-Verarbeitung (Phase: Plugin-Umzug) ──────────────────────────
+
+    /**
+     * Wo wird zusammengefasst? "device" = App macht LLM+Publish selbst,
+     * "server" = nur POST an das BookStack-Theme-Plugin (empfohlen).
+     */
+    var processingMode: String
+        get() = prefs.getString(K_PROC_MODE, "server").orEmpty()
+        set(v) = prefs.edit().putString(K_PROC_MODE, v).apply()
+
+    val isServerMode: Boolean get() = processingMode == "server"
+
+    /** Basis-URL des BookStack-Servers fuer den Ingest-Endpoint. */
+    var ingestBaseUrl: String
+        get() = prefs.getString(K_INGEST_URL, "").orEmpty().trim()
+        set(v) = prefs.edit().putString(K_INGEST_URL, v.trim()).apply()
+
+    /** Shared Secret fuer X-MirMir-Token. */
+    var ingestToken: String
+        get() = prefs.getString(K_INGEST_TOKEN, "").orEmpty().trim()
+        set(v) = prefs.edit().putString(K_INGEST_TOKEN, v.trim()).apply()
+
+    val isIngestConfigured: Boolean
+        get() = ingestBaseUrl.isNotBlank() && ingestToken.isNotBlank()
+
     /** Konfiguration vollstaendig? (Publish-Worker bricht sonst mit klarer Meldung ab.) */
     val isConfigured: Boolean
         get() = bookstackUrl.isNotBlank() &&
@@ -91,6 +116,9 @@ class SettingsStore private constructor(context: Context) {
         const val K_LLM_MODEL = "llm_model"
         const val K_THEME = "theme_mode"
         const val K_CONFIG_PAGE = "config_page_id"
+        const val K_PROC_MODE = "processing_mode"
+        const val K_INGEST_URL = "ingest_base_url"
+        const val K_INGEST_TOKEN = "ingest_token"
 
         /** Buch 3 = „Meetings und Notizen" laut Wiki-Struktur. */
         const val DEFAULT_BOOK_ID = 3

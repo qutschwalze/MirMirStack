@@ -17,8 +17,8 @@ import com.heddrich.companion.llm.MdRenderer
 import com.heddrich.companion.llm.SummaryParser
 import com.heddrich.companion.llm.SummaryResult
 import com.heddrich.companion.llm.TemplateCache
-import com.heddrich.companion.llm.Templates
 import com.heddrich.companion.settings.SettingsStore
+import com.heddrich.companion.publish.ServerPublisher
 import java.util.concurrent.TimeUnit
 
 /**
@@ -42,6 +42,41 @@ class SummarizeWorker(
         if (item.status == IngestStatus.DONE) return Result.success()
 
         dao.update(item.copy(status = IngestStatus.RUNNING))
+
+        // ── SERVER-MODUS: nur senden, Wiki macht den Rest ──────────────────
+        val settings = SettingsStore.Holder.get(applicationContext)
+        if (settings.isServerMode && settings.isIngestConfigured) {
+            try {
+                ServerPublisher.send(applicationContext, id)
+            } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
+                throw ce
+            } catch (e: Exception) {
+                dao.update(item.copy(status = IngestStatus.FAILED, error = e.message?.take(200)))
+                return if (runAttemptCount < MAX_ATTEMPTS && isTransient(e)) Result.retry() else Result.failure()
+            }
+            // Der Server verarbeitet asynchron; die App markiert DONE sobald
+            // der POST akzeptiert wurde. Die resultUrl liefert eine spaetere
+            // Notification/Inbox-Refresh (Wiki-Seite ist dort sichtbar).
+            dao.update(
+                item.copy(
+                    status = IngestStatus.DONE,
+                    error = null,
+                    resultUrl = null // Server entscheidet finalen Seitennamen
+                )
+            )
+            return Result.success()
+        }
+        if (settings.isServerMode && !settings.isIngestConfigured) {
+            dao.update(
+                item.copy(
+                    status = IngestStatus.FAILED,
+                    error = "Server-Modus aktiv, aber URL/Token fehlen – Einstellungen prüfen"
+                )
+            )
+            return Result.failure()
+        }
+
+        // ── GERÄTE-MODUS (Fallback): LLM + Publish wie bisher ─────────────
 
         // ── PROCESS ────────────────────────────────────────────────────────
         val processed = try {

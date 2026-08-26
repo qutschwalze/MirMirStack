@@ -2,6 +2,19 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.6.0 / 18 (2026-08-26)
+
+**Server-Verarbeitung (Plugin-Umzug) — die große Architekturänderung**
+
+Die Zusammenfassung läuft jetzt standardmäßig **auf dem BookStack-Server** statt auf dem Gerät:
+
+- **Neues Theme-Plugin** (`server-plugin/functions.php`) für BookStack: registriert einen authentifizierten Endpoint `/mirmirstack/ingest`, der Text + Vorlage entgegennimmt, sofort 202 bestätigt und LLM-Aufruf, Validierung, Titel-/Tag-Erstellung sowie die komplette Seitenanlage asynchron serverseitig erledigt.
+- **App wird dünn:** Im Server-Modus macht sie nur noch Share → Outbox → ein einziger POST. Kein LLM-Key, kein BookStack-API-Token mehr nötig — nur Ingest-URL + Shared Token (EncryptedSharedPreferences).
+- **Robustheit:** Android-Lifecycle-Probleme (Doze, Force-Stop, Coroutine-Cancellation) betreffen die Pipeline nicht mehr; der Server retryt selbst bei Bedarf.
+- **Umschalter:** Einstellungen → „Verarbeitung" → „Auf dem Server (empfohlen)" / „Auf dem Gerät". Beide Wege bleiben funktionsfähig — der Geräte-Modus dient als Fallback ohne Plugin.
+- **Neuer Ingest-Token** generiert und serverseitig rotiert (alter Token aus Tests ist ungültig).
+- Deploy-Doku im Repo (`server-plugin/README.md`): compose-Variablen (`APP_THEME=mirmirstack`, `MIRMIR_*`), Container-interner API-Zugriff über `http://bookstack/api`.
+
 ## 0.5.3 / 17 (2026-08-25)
 
 **Fix – „Wiki-Seite öffnen" + schnellere Wiederholungen**

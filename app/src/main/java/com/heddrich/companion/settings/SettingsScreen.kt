@@ -54,6 +54,11 @@ fun SettingsRoute(
 
     var theme by remember { mutableStateOf(ThemeMode.fromString(settings.themeMode)) }
 
+    var serverMode by remember { mutableStateOf(settings.isServerMode) }
+    var ingestUrl by remember { mutableStateOf(settings.ingestBaseUrl.ifBlank { "wiki.heddrich.com" }) }
+    var ingestToken by remember { mutableStateOf(settings.ingestToken) }
+    var ingestTesting by remember { mutableStateOf(false) }
+
     var message by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     var llmTesting by remember { mutableStateOf(false) }
@@ -71,6 +76,12 @@ fun SettingsRoute(
         settings.llmBaseUrl = llmUrl
         settings.llmApiKey = llmKey
         settings.llmModel = llmModel
+    }
+
+    fun persistIngest() {
+        settings.processingMode = if (serverMode) "server" else "device"
+        settings.ingestBaseUrl = ingestUrl
+        settings.ingestToken = ingestToken
     }
 
     Column(
@@ -153,7 +164,75 @@ fun SettingsRoute(
 
         HorizontalDivider()
 
-        // ── LLM ────────────────────────────────────────────────────────────
+        // ── Verarbeitung: Server oder Geraet ───────────────────────────────
+        Text("Verarbeitung", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = serverMode,
+                onClick = {
+                    serverMode = true
+                    persistIngest()
+                    scope.launch {
+                        com.heddrich.companion.llm.TemplateCache.refresh(context.applicationContext)
+                    }
+                },
+                label = { Text("Auf dem Server (empfohlen)") }
+            )
+            FilterChip(
+                selected = !serverMode,
+                onClick = {
+                    serverMode = false
+                    persistIngest()
+                },
+                label = { Text("Auf dem Gerät") }
+            )
+        }
+        if (serverMode) {
+            OutlinedTextField(
+                value = ingestUrl,
+                onValueChange = { ingestUrl = it },
+                label = { Text("BookStack-URL") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = ingestToken,
+                onValueChange = { ingestToken = it },
+                label = { Text("Ingest-Token (X-MirMir-Token)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = {
+                    persistIngest()
+                    ingestTesting = true
+                    scope.launch {
+                        message = withContext(Dispatchers.IO) {
+                            try {
+                                com.heddrich.companion.publish.ServerPublisher.testConnection(
+                                    ingestUrl, ingestToken
+                                )
+                            } catch (e: Exception) {
+                                "FEHLER: ${e.message ?: e.javaClass.simpleName}"
+                            }
+                        }
+                        ingestTesting = false
+                    }
+                }) {
+                    Text(if (ingestTesting) "Teste…" else "Server testen")
+                }
+            }
+        } else {
+            Text(
+                "Geräte-Modus: Die App ruft das LLM selbst und legt die Seite an. " +
+                        "Benötigt LLM-Konfiguration unten.",
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+
+        HorizontalDivider()
+
+        // ── LLM (nur im Geräte-Modus relevant) ─────────────────────────────
         Text("KI-Zusammenfassung (OpenAI-kompatibel)", style = MaterialTheme.typography.titleMedium)
 
         OutlinedTextField(
