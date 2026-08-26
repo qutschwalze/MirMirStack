@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.5.1 / 15 (2026-08-25)
+
+**Text-Auswahlmenü + Inbox-Aufräumen**
+
+- **Im Auswahl-Kontextmenü sichtbar:** Text markieren → ⋮ → „MirMirStack" erscheint jetzt direkt (`ACTION_PROCESS_TEXT`) — ohne Sharesheet-Umweg. Der geteilte Text landet wie gewohnt in Vorlagenwahl → Speichern → Auto-Publish.
+- **Inbox aufräumen:** Karte **lange drücken** = Auswahlmodus; weitere Karten antippen markiert/entmarkiert; Papierkorb oben löscht die gesamte Auswahl (laufende Worker werden gestoppt). Einzelne Karte: normal antippen verarbeitet/wiederholt bzw. öffnet bei FERTIG die Wiki-Seite.
+- Status-Badges eingedeutscht (LÄUFT/FERTIG/FEHLER), PDF-Einträge zeigen „PDF (N Z. Text)".
+
 ## 0.5.0 / 14 (2026-08-25)
 
 **Phase 4 – Wiki-getriebene Vorlagen + Seiten-Tags**

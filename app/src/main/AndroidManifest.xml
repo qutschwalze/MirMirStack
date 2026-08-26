@@ -42,6 +42,12 @@
                 <data android:mimeType="application/json" />
                 <data android:mimeType="application/pdf" />
             </intent-filter>
+            <!-- Direkt im Text-Auswahlmenue erscheinen (markieren -> ⋮ -> MirMirStack) -->
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
     </application>
 

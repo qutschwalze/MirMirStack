@@ -198,6 +198,11 @@ class SummarizeWorker(
          * force=true: Bricht einen haengenden/stehengebliebenen Eintrag ab und
          * startet neu (REPLACE) – fuer manuelles Antippen und Start-Sweep.
          */
+        fun cancel(context: Context, itemId: Long) {
+            androidx.work.WorkManager.getInstance(context)
+                .cancelUniqueWork("summarize-$itemId")
+        }
+
         fun enqueue(context: Context, itemId: Long, force: Boolean = false) {
             val request = OneTimeWorkRequestBuilder<SummarizeWorker>()
                 .setInputData(workDataOf(PublishWorker.KEY_ITEM_ID to itemId))

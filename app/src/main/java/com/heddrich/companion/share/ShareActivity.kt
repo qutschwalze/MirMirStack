@@ -272,6 +272,10 @@ internal fun extractFromIntent(resolver: android.content.ContentResolver, intent
                 warning = limited.warning
             }
         }
+        Intent.ACTION_PROCESS_TEXT -> {
+            // Markierter Text aus dem System-Auswahlmenue (ohne Sharesheet-Umweg)
+            text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
+        }
         Intent.ACTION_SEND_MULTIPLE -> {
             @Suppress("DEPRECATION")
             val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
