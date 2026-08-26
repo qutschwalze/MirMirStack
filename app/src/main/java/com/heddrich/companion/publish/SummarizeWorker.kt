@@ -47,14 +47,11 @@ class SummarizeWorker(
         val processed = try {
             process(item)
         } catch (ce: kotlin.coroutines.cancellation.CancellationException) {
-            // Worker wurde gestoppt (Prozessende/Netzwechsel) – KEIN Fehlerfall:
-            // Ehrlich auf QUEUED zuruecksetzen; WorkManager setzt den Job selbst fort.
-            dao.update(
-                item.copy(
-                    status = IngestStatus.QUEUED,
-                    error = "Unterbrochen – wird automatisch fortgesetzt"
-                )
-            )
+            // Abbruch (Prozess-Stop/Netzwechsel): SOFORT weiterreichen, KEINE
+            // Suspend-Aufrufe mehr hier (in einer abgebrochenen Coroutine
+            // wuerden sie sofort wieder abbrechen – genau das verursachte den
+            // „Unterbrochen“-Limbo). Der Status bleibt RUNNING; der Start-Sweep
+            // (App.onCreate) nimmt solche Items mit und startet sie neu.
             throw ce
         } catch (e: Exception) {
             // Verstaendliche Diagnose: HTTP-Code + Body-Auszug statt nur Klassenname
@@ -218,6 +215,28 @@ class SummarizeWorker(
                 if (force) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
                 request
             )
+        }
+
+        /**
+         * Smart-Tap fuer die Inbox: Läuft ein Job wirklich (ENQUEUED/RUNNING im
+         * WorkManager), wird er nicht angetastet — das fruehere blinde REPLACE
+         * hat einen aktiven Lauf gekillt und damit die „Unterbrochen“-Schleife
+         * verursacht. Nur wenn NICHTS aktiv ist (verwaister Queue-Eintrag oder
+         * FINISHED/CANCELLED), wird mit REPLACE neu gestartet.
+         * Liefert eine kurze Rueckmeldung fuer UI/Snackbar.
+         */
+        suspend fun tapResume(context: Context, itemId: Long): String {
+            val wm = androidx.work.WorkManager.getInstance(context)
+            val info = wm.getWorkInfosForUniqueWork("summarize-$itemId").get().firstOrNull()
+            return if (info != null &&
+                (info.state == androidx.work.WorkInfo.State.ENQUEUED ||
+                        info.state == androidx.work.WorkInfo.State.RUNNING)
+            ) {
+                "Job läuft bereits – kein Neustart nötig"
+            } else {
+                enqueue(context, itemId, force = true)
+                "Neustart angestoßen"
+            }
         }
     }
 }

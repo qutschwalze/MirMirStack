@@ -152,7 +152,10 @@ fun InboxScreen(items: List<IngestItem>) {
                                 }
                                 item.status == IngestStatus.QUEUED ||
                                         item.status == IngestStatus.FAILED -> {
-                                    SummarizeWorker.enqueue(context, item.id, force = true)
+                                    scope.launch(Dispatchers.IO) {
+                                        val msg = SummarizeWorker.tapResume(context.applicationContext, item.id)
+                                        kotlinx.coroutines.withContext(Dispatchers.Main) { }
+                                    }
                                 }
                             }
                         },

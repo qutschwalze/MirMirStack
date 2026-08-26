@@ -2,6 +2,16 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.5.2 / 16 (2026-08-25)
+
+**Fix – Endlosschleife „Unterbrochen – wird automatisch fortgesetzt"**
+
+Feldbefund: Nach dem Schließen der App blieb das Item dauerhaft auf „Unterbrochen…"; Antippen startete zwar neu, fiel aber sofort wieder zurück.
+
+- **Wurzel 1:** Der Status-Rücksetzer im Abbruchpfad war selbst ein Suspend-Aufruf — in einer bereits abgebrochenen Coroutine brach er sofort wieder ab und hinterließ das Item im RUNNING-Limbo (je nach Timing mal „Unterbrochen", mal RUNNING).
+- **Wurzel 2:** Antippen lief mit blindem REPLACE und killte damit einen gerade aktiven Neuversuch → Abbruch → „Unterbrochen" → Schleife.
+- **Fixe:** Kein DB-Schreiben mehr im Cancellation-Pfad (sofortiges Weiterreichen an WorkManager); Recovery-Sweep beim App-Start nimmt jetzt auch RUNNING-Limbo-Einträge mit; Smart-Tap prüft den echten WorkManager-Zustand — aktiver Job bleibt unberührt, nur ein toter Eintrag wird ersetzt.
+
 ## 0.5.1 / 15 (2026-08-25)
 
 **Text-Auswahlmenü + Inbox-Aufräumen**

@@ -27,9 +27,13 @@ interface IngestItemDao {
     @Query("DELETE FROM ingest_items WHERE id IN (:ids)")
     suspend fun deleteAll(ids: List<Long>): Int
 
-    /** Hängengebliebene Aufträge: gespeichert, aber nie verarbeitet worden. */
+    /**
+     * Hängengebliebene Aufträge: eingereicht (templateId gesetzt), aber nie
+     * fertig geworden – inklusive RUNNING-Limbo nach Prozess-Abbruch.
+     */
     @Query(
-        "SELECT * FROM ingest_items WHERE status = 'QUEUED' AND templateId IS NOT NULL"
+        "SELECT * FROM ingest_items " +
+                "WHERE templateId IS NOT NULL AND status IN ('QUEUED', 'RUNNING')"
     )
-    suspend fun queuedSubmitted(): List<IngestItem>
+    suspend fun submittedNotDone(): List<IngestItem>
 }

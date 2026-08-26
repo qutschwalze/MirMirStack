@@ -2,6 +2,7 @@ package com.heddrich.companion
 
 import android.app.Application
 import com.heddrich.companion.data.CompanionDatabase
+import com.heddrich.companion.data.IngestStatus
 import com.heddrich.companion.publish.SummarizeWorker
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlinx.coroutines.CoroutineScope
@@ -18,17 +19,25 @@ class App : Application() {
     }
 
     /**
-     * Recovery-Sweep beim App-Start: Nach einem Force-Stop haelt Android
-     * WorkManager-Jobs an bis die App wieder geoeffnet wird. Alle Items,
-     * die gespeichert (templateId gesetzt), aber nie verarbeitet wurden,
-     * werden hier neu eingereiht – force ueberschreibt verwaiste Eintraege.
+     * Recovery-Sweep beim App-Start: Nach einem Prozess-Stop haelt Android
+     * WorkManager-Jobs an bis die App wieder geoeffnet wird. Alle Items, die
+     * eingereicht aber nie fertig wurden (QUEUD **und** RUNNING-Limbo aus
+     * abgebrochenen Laeufen), werden hier sauber auf QUEUED gesetzt und
+     * force-neu eingereiht (REPLACE ueberschreibt verwaiste Queue-Eintraege).
      */
     private fun recoverStalledQueue() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                CompanionDatabase.get(this@App).ingestItemDao()
-                    .queuedSubmitted()
-                    .forEach { SummarizeWorker.enqueue(this@App, it.id, force = true) }
+                val dao = CompanionDatabase.get(this@App).ingestItemDao()
+                dao.submittedNotDone().forEach { item ->
+                    dao.update(
+                        item.copy(
+                            status = IngestStatus.QUEUED,
+                            error = null // altes „Unterbrochen…“ aufräumen
+                        )
+                    )
+                    SummarizeWorker.enqueue(this@App, item.id, force = true)
+                }
             } catch (_: Throwable) {
                 // Recovery darf den App-Start niemals brechen
             }
