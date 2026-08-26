@@ -46,6 +46,7 @@ fun SettingsRoute(
     var tokenId by remember { mutableStateOf(settings.bookstackTokenId) }
     var tokenSecret by remember { mutableStateOf(settings.bookstackTokenSecret) }
     var bookId by remember { mutableStateOf(settings.targetBookId.toString()) }
+    var configPage by remember { mutableStateOf(settings.configPageId.toString()) }
 
     var llmUrl by remember { mutableStateOf(settings.llmBaseUrl) }
     var llmKey by remember { mutableStateOf(settings.llmApiKey) }
@@ -63,6 +64,7 @@ fun SettingsRoute(
         settings.bookstackTokenId = tokenId
         settings.bookstackTokenSecret = tokenSecret
         settings.targetBookId = bookId.toIntOrNull() ?: 3
+        settings.configPageId = configPage.toIntOrNull() ?: 0
     }
 
     fun persistLlm() {
@@ -106,6 +108,13 @@ fun SettingsRoute(
             value = bookId,
             onValueChange = { bookId = it.filter(Char::isDigit).take(4) },
             label = { Text("Ziel-Buch-ID (3 = Meetings und Notizen)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = configPage,
+            onValueChange = { configPage = it.filter(Char::isDigit).take(6) },
+            label = { Text("Vorlagen-Konfig-Seite ID (0 = eingebaute Vorlagen)") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )

@@ -107,16 +107,20 @@ class BookStackClient internal constructor(
     suspend fun upsertPage(
         chapterId: Int,
         name: String,
-        html: String
+        html: String,
+        tags: List<TagDto> = emptyList()
     ): Pair<PageDto, Boolean> {
         val existing = api.pages(count = 10, nameEquals = name, chapterId = chapterId)
             .data.firstOrNull()
         return if (existing != null) {
-            api.updatePage(existing.id, PageWriteRequest(chapterId, null, name, html)) to false
+            api.updatePage(existing.id, PageWriteRequest(chapterId, null, name, html, tags)) to false
         } else {
-            api.createPage(PageWriteRequest(chapterId, null, name, html)) to true
+            api.createPage(PageWriteRequest(chapterId, null, name, html, tags)) to true
         }
     }
+
+    /** HTML-Inhalt einer Wiki-Seite (fuer die Vorlagen-Konfiguration, Phase 4). */
+    suspend fun pageHtml(pageId: Int): String? = api.page(pageId).html
 
     /**
      * Original als Attachment an die Seite haengen.

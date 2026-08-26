@@ -54,6 +54,10 @@ interface BookStackApi {
         @Body body: PageWriteRequest
     ): PageDto
 
+    /** Einzelne Seite abrufen (u. a. fuer die Vorlagen-Konfigurationsseite). */
+    @GET("pages/{id}")
+    suspend fun page(@Path("id") id: Int): PageDto
+
     @Multipart
     @POST("attachments")
     suspend fun createAttachment(

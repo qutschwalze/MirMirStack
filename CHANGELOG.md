@@ -2,6 +2,15 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.5.0 / 14 (2026-08-25)
+
+**Phase 4 – Wiki-getriebene Vorlagen + Seiten-Tags**
+
+- **Vorlagen im Wiki pflegbar:** Eine private Konfig-Seite (Seiten-ID in den Einstellungen hinterlegbar) hält Vorlagen als JSON. Wiki-Vorlagen mit gleicher ID überschreiben Name/Prompt/Tags der eingebauten; neue IDs ergänzen die Liste. Toleranter HTML→JSON-Extraktor (Codefence oder Klammer-Scan); bei Parsefehlern greifen die eingebauten Vorlagen weiter und ein Warnhinweis erscheint — niemals Crash, niemals leere Vorlagenliste.
+- **Seiten-Tags:** Jede publizierte Seite bekommt jetzt Tags: `typ=<vorlage>` (aus der Vorlagen-Konfig), `quelle=<sherpa|browser|whatsapp|…>`, `thema=…` aus dem LLM und `person=…` pro erkanntem Teilnehmer. Im Wiki damit filter- und auffindbar.
+- **Refresh-Zyklen:** Vorlagen-Cache lädt beim App-Start und vor jedem Verarbeitungslauf; Fehler lassen den letzten Stand aktiv.
+- Neue Tests: WikiTemplateLoader (Override, Append, kaputtes JSON → Defaults+Warnung, Codefence-/Klammer-Extraktion) — insgesamt 51.
+
 ## 0.4.5 / 13 (2026-08-25)
 
 **Fix – „Unterbrochen, wird fortgesetzt" blieb für immer hängen**

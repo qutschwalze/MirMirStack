@@ -38,7 +38,12 @@ object Publisher {
     /**
      * Publiziert bereits gerendertes HTML (aus dem LLM-Pfad oder Rohtext-Fallback).
      */
-    suspend fun publishHtml(appContext: Context, item: IngestItem, html: String): PublishResult {
+    suspend fun publishHtml(
+        appContext: Context,
+        item: IngestItem,
+        html: String,
+        tags: List<com.heddrich.companion.bookstack.TagDto> = emptyList()
+    ): PublishResult {
         val settings = SettingsStore.Holder.get(appContext)
         if (!settings.isConfigured) {
             return PublishResult.Failure(
@@ -67,7 +72,8 @@ object Publisher {
             val (page, created) = client.upsertPage(
                 chapterId = chapter.id,
                 name = pageTitle,
-                html = html
+                html = html,
+                tags = tags
             )
 
             // 3) Original als Attachment – bevorzugt die byte-genue Lossless-Kopie

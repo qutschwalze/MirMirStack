@@ -90,6 +90,11 @@ class ShareActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Wiki-Vorlagen-Overrides beim Start frisch ziehen (fehler-tolerant)
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            com.heddrich.companion.llm.TemplateCache.refresh(applicationContext)
+        }
+
         val referrerHost = try {
             referrer?.host
         } catch (_: Exception) {
@@ -428,13 +433,13 @@ private fun ShareEditor(s: ShareLoadState.Ready) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            // Vorlagenwahl (Vorauswahl kam aus der Quell-Erkennung)
+            // Vorlagenwahl (Defaults + Wiki-Overrides aus dem TemplateCache)
             Text("Vorlage", style = MaterialTheme.typography.labelLarge)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                com.heddrich.companion.llm.Templates.all().forEach { t ->
+                com.heddrich.companion.llm.TemplateCache.templates.forEach { t ->
                     FilterChip(
                         selected = templateId == t.id,
                         onClick = { templateId = t.id },

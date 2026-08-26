@@ -56,11 +56,18 @@ data class PageListResponse(
 )
 
 @Serializable
+data class TagDto(
+    val name: String,
+    val value: String
+)
+
+@Serializable
 data class PageWriteRequest(
     @SerialName("chapter_id") val chapterId: Int? = null,
     @SerialName("book_id") val bookId: Int? = null,
     val name: String,
-    val html: String
+    val html: String,
+    val tags: List<TagDto> = emptyList()
 )
 
 @Serializable

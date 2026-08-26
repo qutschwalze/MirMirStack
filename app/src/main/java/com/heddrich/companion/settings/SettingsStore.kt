@@ -66,6 +66,13 @@ class SettingsStore private constructor(context: Context) {
         get() = prefs.getString(K_THEME, "SYSTEM").orEmpty()
         set(v) = prefs.edit().putString(K_THEME, v).apply()
 
+    // ── Vorlagen-Konfigurationsseite (Phase 4) ─────────────────────────────
+
+    /** Wiki-Seiten-ID der privaten Vorlagen-Konfiguration (0 = aus). */
+    var configPageId: Int
+        get() = prefs.getInt(K_CONFIG_PAGE, 0)
+        set(v) = prefs.edit().putInt(K_CONFIG_PAGE, v).apply()
+
     /** Konfiguration vollstaendig? (Publish-Worker bricht sonst mit klarer Meldung ab.) */
     val isConfigured: Boolean
         get() = bookstackUrl.isNotBlank() &&
@@ -83,6 +90,7 @@ class SettingsStore private constructor(context: Context) {
         const val K_LLM_KEY = "llm_api_key"
         const val K_LLM_MODEL = "llm_model"
         const val K_THEME = "theme_mode"
+        const val K_CONFIG_PAGE = "config_page_id"
 
         /** Buch 3 = „Meetings und Notizen" laut Wiki-Struktur. */
         const val DEFAULT_BOOK_ID = 3

@@ -9,12 +9,14 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.heddrich.companion.bookstack.TagDto
 import com.heddrich.companion.data.CompanionDatabase
 import com.heddrich.companion.data.IngestStatus
 import com.heddrich.companion.llm.LlmClient
 import com.heddrich.companion.llm.MdRenderer
 import com.heddrich.companion.llm.SummaryParser
 import com.heddrich.companion.llm.SummaryResult
+import com.heddrich.companion.llm.TemplateCache
 import com.heddrich.companion.llm.Templates
 import com.heddrich.companion.settings.SettingsStore
 import java.util.concurrent.TimeUnit
@@ -80,9 +82,14 @@ class SummarizeWorker(
             is Processed.Summary -> renderSummary(processed.summary)
             is Processed.Fallback -> processed.html
         }
+        val tags = when (processed) {
+            is Processed.Summary ->
+                buildTags(item, processed.template, processed.summary)
+            is Processed.Fallback -> emptyList()
+        }
 
         // ── PUBLISH ────────────────────────────────────────────────────────
-        return when (val result = Publisher.publishHtml(applicationContext, item, html)) {
+        return when (val result = Publisher.publishHtml(applicationContext, item, html, tags)) {
             is PublishResult.Success -> {
                 dao.update(item.copy(status = IngestStatus.DONE, resultUrl = result.wikiUrl, error = null))
                 Result.success()
@@ -98,11 +105,6 @@ class SummarizeWorker(
         }
     }
 
-    private sealed interface Processed {
-        data class Summary(val summary: SummaryResult) : Processed
-        data class Fallback(val html: String) : Processed
-    }
-
     /** Zusammenfassung via LLM – oder Fallback Rohtext, wenn LLM nicht konfiguriert ist. */
     private suspend fun process(item: com.heddrich.companion.data.IngestItem): Processed {
         val settings = SettingsStore.Holder.get(applicationContext)
@@ -110,10 +112,47 @@ class SummarizeWorker(
         if (!settings.isLlmConfigured || rawText.isBlank()) {
             return Processed.Fallback(fallbackHtml(rawText))
         }
+        // Wiki-Overrides frisch ziehen (fehler-tolerant, Cache bleibt bei Problemen)
+        TemplateCache.refresh(applicationContext)
+        val template = TemplateCache.find(item.templateId)
+
         val client = LlmClient(settings.llmBaseUrl, settings.llmApiKey)
-        val template = Templates.byId(item.templateId)
         val answer = client.complete(settings.llmModel, template.systemPrompt, rawText)
-        return Processed.Summary(SummaryParser.parse(answer))
+        return Processed.Summary(SummaryParser.parse(answer), template)
+    }
+
+    private sealed interface Processed {
+        data class Summary(
+            val summary: SummaryResult,
+            val template: com.heddrich.companion.llm.Template
+        ) : Processed
+        data class Fallback(val html: String) : Processed
+    }
+
+    /**
+     * Effektive Wiki-Tags: Vorlagen-Defaults (z. B. typ=meeting), Quelle,
+     * thematische Tags aus dem LLM (thema=…) und Personen (person=…).
+     */
+    private fun buildTags(
+        item: com.heddrich.companion.data.IngestItem,
+        template: com.heddrich.companion.llm.Template,
+        summary: SummaryResult
+    ): List<TagDto> {
+        val tags = mutableListOf<TagDto>()
+        fun add(name: String, value: String) {
+            val v = value.trim()
+            if (v.isNotEmpty() && tags.none { it.name == name && it.value.equals(v, true) }) {
+                tags.add(TagDto(name, v))
+            }
+        }
+        for (t in template.defaultTags) {
+            val i = t.indexOf('=')
+            if (i > 0) add(t.substring(0, i).trim(), t.substring(i + 1))
+        }
+        add("quelle", item.sourceKind.name.lowercase())
+        summary.tags.forEach { add("thema", it) }
+        summary.participants.forEach { add("person", it) }
+        return tags
     }
 
     private fun fallbackHtml(rawText: String): String {

@@ -4,13 +4,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Eingebaute Vorlagen (Phase 3). Phase 4 ergaenzt Wiki-getriebene Config;
- * Struktur (id, name, prompt) ist bereits darauf ausgelegt.
+ * Eingebaute Vorlagen (Phase 3/4). Wiki-getriebene Overrides kommen ueber den
+ * WikiTemplateLoader; Struktur (id, name, prompt, tags) ist darauf ausgelegt.
  */
 data class Template(
     val id: String,
     val displayName: String,
-    val systemPrompt: String
+    val systemPrompt: String,
+    /** Vorgeschlagene Wiki-Seiten-Tags im Format "name=wert". */
+    val defaultTags: List<String> = emptyList()
 )
 
 object Templates {
@@ -25,7 +27,8 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt mit genau diesen Feldern:
  "todos": string[] (Aufgaben mit Verantwortlichen falls erkennbar),
  "participants": string[] (genannte Teilnehmer/Namen),
  "tags": string[] (2-5 thematische Tags)}
-Kein Markdown-Codeblock, kein Text ausserhalb des JSON."""
+Kein Markdown-Codeblock, kein Text ausserhalb des JSON.""",
+        defaultTags = listOf("typ=meeting")
     )
 
     val RESEARCH = Template(
@@ -39,7 +42,8 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt mit genau diesen Feldern:
  "todos": string[] (offene Punkte zum Nachrecherchieren),
  "participants": [],
  "tags": string[] (2-5 thematische Tags)}
-Kein Markdown-Codeblock, kein Text ausserhalb des JSON."""
+Kein Markdown-Codeblock, kein Text ausserhalb des JSON.""",
+        defaultTags = listOf("typ=recherche")
     )
 
     val CHAT = Template(
@@ -53,7 +57,8 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt mit genau diesen Feldern:
  "todos": string[] (zugesagte Aufgaben),
  "participants": string[] (Beteiligte falls erkennbar),
  "tags": string[] (2-5 thematische Tags)}
-Kein Markdown-Codeblock, kein Text ausserhalb des JSON."""
+Kein Markdown-Codeblock, kein Text ausserhalb des JSON.""",
+        defaultTags = listOf("typ=chat")
     )
 
     val UNIVERSAL = Template(
@@ -68,7 +73,8 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt mit genau diesen Feldern:
  "todos": string[],
  "participants": string[],
  "tags": string[]}
-Kein Markdown-Codeblock, kein Text ausserhalb des JSON."""
+Kein Markdown-Codeblock, kein Text ausserhalb des JSON.""",
+        defaultTags = listOf("typ=allgemein")
     )
 
     fun byId(id: String?): Template = when (id) {
