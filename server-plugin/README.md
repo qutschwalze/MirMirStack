@@ -52,6 +52,22 @@ Auth-Fehler -> 401, fehlender Text -> 422.
 
        tail /root/bookstack/data/config/www/themes/mirmirstack/ingest.log
 
+## Update-Kompatibilitaet (BookStack-Upgrades)
+
+Das Plugin nutzt ausschliesslich das offizielle Logical Theme System
+(functions.php + APP_BOOT-Routenregistrierung) - keine Core-Aenderungen.
+Das Theme liegt im gemounteten /config-Volume und ueberlebt Container-
+Updates; ebenso die MIRMIR_*-Variablen im compose-File.
+
+Nach jedem BookStack-Update den 30-Sekunden-Check fahren:
+
+    docker exec bookstack php /app/www/artisan route:list | grep mirmirstack
+    curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:6875/mirmirstack/ingest   # 401 erwartet
+
+Falls etwas nicht geht: In der compose THEME-Zeile APP_THEME= leeren,
+Container neu starten -> Standard-BookStack ohne Plugin; die App kann
+im Geraete-Modus weiterarbeiten, bis das Plugin gefixt ist.
+
 ## App-Seitige Konfiguration
 
 Einstellungen -> Verarbeitung -> "Auf dem Server":
