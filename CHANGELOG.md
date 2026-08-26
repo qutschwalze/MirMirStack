@@ -2,6 +2,16 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.5.3 / 17 (2026-08-25)
+
+**Fix – „Wiki-Seite öffnen" + schnellere Wiederholungen**
+
+Feldbefund: Pipeline lief durch (Wiki-Seite entstanden), aber der Button „Wiki-Seite öffnen" reagierte nicht; Gesamtdauer 40–50 s.
+
+- **Button-Fix:** Beim Inbox-Rewrite war der onClick des Buttons leer geblieben — die Aktion lag nur auf dem Karten-Tap. Der Button öffnet die Wiki-Seite jetzt direkt.
+- **Schnellere Retries:** Backoff-Startintervall 30 s → 10 s; ein einzelner 429/Netzfehler kostet so ~10 s statt ~40 s (passt zum beobachteten „40–50 s").
+- **Weniger Roundtrips:** Die Wiki-URL kommt jetzt aus dem `url`-Feld der BookStack-Antwort statt über einen zusätzlichen Bücher-Request.
+
 ## 0.5.2 / 16 (2026-08-25)
 
 **Fix – Endlosschleife „Unterbrochen – wird automatisch fortgesetzt"**

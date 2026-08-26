@@ -47,7 +47,9 @@ data class PageDto(
     val slug: String? = null,
     @SerialName("book_id") val bookId: Int? = null,
     @SerialName("chapter_id") val chapterId: Int? = null,
-    val html: String? = null
+    val html: String? = null,
+    /** Vollstaendige Wiki-URL laut BookStack – spart uns eigene URL-Bastelei. */
+    val url: String? = null
 )
 
 @Serializable

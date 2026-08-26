@@ -79,12 +79,13 @@ class BookStackClient internal constructor(
     }
 
     /**
-     * Echte Wiki-URL einer Seite: {base}/books/{book-slug}/page/{page-slug}.
-     * Beide Slugs kommen aus der API – nichts wird erraten.
+     * Echte Wiki-URL einer Seite: bevorzugt das von BookStack gelieferte
+     * `url`-Feld (kein Extra-Roundtrip); Fallback: aus Buch-/Seiten-Slug gebaut.
      */
     suspend fun webUrlFor(page: PageDto): String {
+        page.url?.takeIf { it.isNotBlank() }?.let { return it }
         val bookSlug = api.books(50).data.firstOrNull { it.id == page.bookId }?.slug
-            ?: return "$rootUrl/page/${page.id}" // Notfall-Link ohne Buchkontext
+            ?: return "$rootUrl/page/${page.id}"
         return "$rootUrl/books/$bookSlug/page/${page.slug ?: page.id}"
     }
 

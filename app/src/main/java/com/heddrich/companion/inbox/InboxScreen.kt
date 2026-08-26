@@ -162,9 +162,12 @@ fun InboxScreen(items: List<IngestItem>) {
                         onLongClick = {
                             if (isSelected) selected.remove(item.id) else selected.add(item.id)
                         },
-                        onDelete = {
-                            SummarizeWorker.cancel(context, item.id)
-                            scope.launch(Dispatchers.IO) { dao.delete(item.id) }
+                        onOpenWiki = {
+                            if (!item.resultUrl.isNullOrBlank()) {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(item.resultUrl))
+                                )
+                            }
                         }
                     )
                 }
@@ -180,7 +183,7 @@ private fun IngestRow(
     isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    onDelete: () -> Unit
+    onOpenWiki: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -226,11 +229,9 @@ private fun IngestRow(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (item.status) {
-                    IngestStatus.DONE -> if (!item.resultUrl.isNullOrBlank()) {
-                        Button(onClick = {
-                            // onClick auf der Karte oeffnet bereits; Button fuer Klarheit
-                        }) { Text("Wiki-Seite öffnen") }
-                    }
+                IngestStatus.DONE -> if (!item.resultUrl.isNullOrBlank()) {
+                    Button(onClick = onOpenWiki) { Text("Wiki-Seite öffnen") }
+                }
                     IngestStatus.RUNNING -> {
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                     }

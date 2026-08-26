@@ -208,7 +208,9 @@ class SummarizeWorker(
                 )
                 // Expedited = sofortige Ausfuehrung statt Warteschlangen-Latenz
                 .setExpedited(androidx.work.OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                // 10 s Start-Intervall: Ein 429/Netzfehler kostet so nur ~10 s
+                // statt 30 s (Feldbefund 0.4.x: „40-50 Sekunden“)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
                 .build()
             androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
                 "summarize-$itemId",
