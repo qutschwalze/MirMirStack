@@ -2,7 +2,18 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
-## 0.6.0 / 18 (2026-08-26)
+## 0.6.1 / 18 (2026-08-26)
+
+**Prozessfix – Version wurde bei 0.6.0 nicht erhöht**
+
+Feldbefund: Die v0.6.0-APKs trugen intern noch 0.5.3 (versionCode 17) — der Bump wurde beim Release vergessen. Inhaltlich war v0.6.0 vollständig (Server-Modus funktioniert), nur die Versionsnummer stimmte nicht.
+
+- Korrektur auf 0.6.1 / versionCode 18; künftige Builds wieder mit Bump vor jedem Release.
+- Keine funktionalen Änderungen gegenüber dem v0.6.0-Stand.
+
+## 0.6.0 / 18* (2026-08-26)
+
+*\*Versionsnummer fehlerhaft: APKs enthielten 0.5.3/17*
 
 **Server-Verarbeitung (Plugin-Umzug) — die große Architekturänderung**
 
