@@ -439,15 +439,22 @@ private fun ShareEditor(s: ShareLoadState.Ready) {
             )
             // Vorlagenwahl (Defaults + Wiki-Overrides aus dem TemplateCache)
             Text("Vorlage", style = MaterialTheme.typography.labelLarge)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 com.heddrich.companion.llm.TemplateCache.templates.forEach { t ->
                     FilterChip(
                         selected = templateId == t.id,
                         onClick = { templateId = t.id },
-                        label = { Text(t.displayName) }
+                        label = {
+                            Text(
+                                t.displayName,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }

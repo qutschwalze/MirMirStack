@@ -11,3 +11,7 @@ captures/
 *.jks
 *.keystore
 .hermes/
+
+# Fremde Repos/Artefakte im Workspace
+_audit_*/
+sherpa-transcript-showcase-draft.md

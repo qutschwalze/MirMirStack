@@ -2,6 +2,15 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.6.2 / 19 (2026-08-26)
+
+**Fix – deformiertes Vorlagen-Menü im Share-Screen**
+
+Feldbefund (Screenshot): Die Vorlagen-Chips lagen in einer Zeile; „Chat-Digest" und folgende wickelten um und wurden gequetscht.
+
+- Vorlagenwahl jetzt vertikal: ein Chip pro Zeile, volle Breite, lange Namen mit Ellipsis.
+- Keine funktionalen Änderungen.
+
 ## 0.6.1 / 18 (2026-08-26)
 
 **Prozessfix – Version wurde bei 0.6.0 nicht erhöht**
