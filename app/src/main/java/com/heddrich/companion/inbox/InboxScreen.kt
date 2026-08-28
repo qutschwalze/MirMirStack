@@ -195,6 +195,26 @@ fun InboxScreen(items: List<IngestItem>) {
                                     Intent(Intent.ACTION_VIEW, Uri.parse(item.resultUrl))
                                 )
                             }
+                        },
+                        onOpenFile = {
+                            if (!item.rawLocalPath.isNullOrBlank()) {
+                                runCatching {
+                                    val file = java.io.File(item.rawLocalPath)
+                                    val fileUri = androidx.core.content.FileProvider.getUriForFile(
+                                        context,
+                                        context.packageName + ".fileprovider",
+                                        file
+                                    )
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW)
+                                            .setDataAndType(
+                                                fileUri,
+                                                item.mime ?: "application/octet-stream"
+                                            )
+                                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    )
+                                }
+                            }
                         }
                     )
                 }
@@ -245,7 +265,8 @@ private fun IngestRow(
     isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    onOpenWiki: () -> Unit
+    onOpenWiki: () -> Unit,
+    onOpenFile: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -291,8 +312,12 @@ private fun IngestRow(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (item.status) {
-                IngestStatus.DONE -> if (!item.resultUrl.isNullOrBlank()) {
-                    Button(onClick = onOpenWiki) { Text("Wiki-Seite öffnen") }
+                IngestStatus.DONE -> {
+                    if (!item.resultUrl.isNullOrBlank()) {
+                        Button(onClick = onOpenWiki) { Text("Wiki-Seite öffnen") }
+                    } else if (!item.rawLocalPath.isNullOrBlank()) {
+                        Button(onClick = onOpenFile) { Text("Datei öffnen") }
+                    }
                 }
                     IngestStatus.RUNNING -> {
                         LinearProgressIndicator(Modifier.fillMaxWidth())

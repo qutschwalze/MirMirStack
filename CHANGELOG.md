@@ -2,6 +2,16 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.8.0 / 21 (2026-08-27)
+
+**Datensammler – alles annehmen, Unbekanntes speichern**
+
+- **Catch-all Share-Target:** Die App erscheint jetzt beim Teilen für *jedes* Format (`*/*`), nicht nur Text/JSON/PDF.
+- **Format-Erkennung:** Textartige Inhalte (md/txt/json/csv/xml/yaml/log/…) werden wie bisher zusammengefasst; PDF bleibt besonders; **alles Unbekannte (Bilder, ZIP, APK, Audio, …) wird verlustfrei als Datei gespeichert** (`filesDir/originals`, Namenskollisionen mit Zeitstempel).
+- **Sammler-Einträge** bekommen den Dateinamen als Titel, Status DONE mit Notification „Datei gespeichert" — kein LLM, kein Wiki nötig.
+- **Datei öffnen** aus der Inbox per FileProvider (Original bleibt lokal auf dem Gerät).
+- Mehrfach-Share: weiterhin wird die erste Datei übernommen (bewusste Phase-1-Grenze).
+
 ## 0.7.0 / 20 (2026-08-27)
 
 **Phase 5 – Fertig-Notification + Quick-Capture**

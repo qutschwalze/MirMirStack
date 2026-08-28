@@ -43,6 +43,22 @@ class SummarizeWorker(
 
         dao.update(item.copy(status = IngestStatus.RUNNING))
 
+        // ── SAMMLER: Inhalt nur gespeichert (unbekanntes Format) ────────────
+        // Kein LLM, kein Wiki – die Datei liegt bereits unter rawLocalPath.
+        if (item.rawText.isNullOrBlank() && !item.rawLocalPath.isNullOrBlank()) {
+            dao.update(
+                item.copy(
+                    status = IngestStatus.DONE,
+                    error = null,
+                    resultUrl = null
+                )
+            )
+            com.heddrich.companion.notify.AppNotifier.publishCollected(
+                applicationContext, item.title ?: "Datei gespeichert"
+            )
+            return Result.success()
+        }
+
         // ── SERVER-MODUS: nur senden, Wiki macht den Rest ──────────────────
         val settings = SettingsStore.Holder.get(applicationContext)
         if (settings.isServerMode && settings.isIngestConfigured) {

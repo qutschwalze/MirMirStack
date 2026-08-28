@@ -36,6 +36,26 @@ object AppNotifier {
         }
     }
 
+    /** Gesammelte Datei (Datensammler) – ohne Wiki-Seite, oeffnet die Inbox. */
+    fun publishCollected(context: Context, title: String?) {
+        ensureChannel(context)
+        val contentIntent = PendingIntent.getActivity(
+            context, 0,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_note)
+            .setContentTitle(title?.take(60) ?: "Datei gespeichert")
+            .setContentText("Datei gespeichert – antippen öffnet die Inbox")
+            .setContentIntent(contentIntent)
+            .setAutoCancel(true)
+            .build()
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(NOTIF_ID + 1, notification)
+    }
+
     fun publishDone(context: Context, title: String?, url: String?) {
         ensureChannel(context)
 

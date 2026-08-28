@@ -165,6 +165,47 @@ suspend fun receiveSharedItem(
             }
         }
 
+        // Sammler-Modus: Unbekanntes Format -> Datei verlustfrei sichern
+        if (extracted.isBinary && extracted.rawUri != null) {
+            val binUri = android.net.Uri.parse(extracted.rawUri)
+            val copyPath = PdfSupport.copyOriginal(appContext, binUri)
+            if (copyPath == null) {
+                return failState(
+                    appContext = appContext,
+                    referrerHost = referrerHost,
+                    message = "Datei konnte nicht gespeichert werden.",
+                    stack = "",
+                    extracted = extracted
+                )
+            }
+            val displayName = PdfSupport.displayNameOf(appContext, binUri)
+                ?: java.io.File(copyPath).name
+            val binItem = IngestItem(
+                createdAt = System.currentTimeMillis(),
+                sourcePkg = referrerHost,
+                sourceKind = SourceDetector.detect(referrerHost, displayName),
+                templateId = "universal",
+                title = displayName,
+                rawText = null,
+                rawUri = null,
+                mime = extracted.mime,
+                status = IngestStatus.QUEUED,
+                error = "Datei gespeichert (unbekanntes Format)",
+                resultUrl = null,
+                rawLocalPath = copyPath
+            )
+            val binId = CompanionDatabase.get(appContext).ingestItemDao().insert(binItem)
+            return ShareLoadState.Ready(
+                itemId = binId,
+                preview = displayName,
+                mime = extracted.mime,
+                rawUri = null,
+                sourcePkg = referrerHost,
+                sourceKind = binItem.sourceKind,
+                warning = "Unbekanntes Format – die Datei wird nur gespeichert und nicht zusammengefasst."
+            )
+        }
+
         val pkg = referrerHost
             ?: extracted.rawUri?.let { runCatching { Uri.parse(it).authority }.getOrNull() }
         val kind = SourceDetector.detect(pkg, text?.take(600))
@@ -246,8 +287,21 @@ internal data class Extracted(
     val mime: String?,
     val rawUri: String?,
     val warning: String?,
-    val isPdf: Boolean = false
+    val isPdf: Boolean = false,
+    val isBinary: Boolean = false
 )
+
+/** Erkennung: Ist der MIME-Typ bzw. die Dateiendung textartig? */
+private fun isTextish(mime: String?, uri: Uri?): Boolean {
+    if (mime?.startsWith("text/") == true) return true
+    if (mime in setOf(
+            "application/json", "application/xml", "application/x-yaml",
+            "application/csv", "text/markdown"
+        )
+    ) return true
+    val ext = uri?.toString()?.substringAfterLast('.', "")?.lowercase()
+    return ext in setOf("md", "txt", "json", "csv", "xml", "yaml", "yml", "log", "tsv")
+}
 
 internal fun extractFromIntent(resolver: android.content.ContentResolver, intent: Intent?): Extracted {
     if (intent == null) return Extracted(null, null, null, null)
@@ -256,16 +310,19 @@ internal fun extractFromIntent(resolver: android.content.ContentResolver, intent
     var mime: String? = intent.type
     var warning: String? = null
     var isPdf = false
+    var isBinary = false
 
     when (intent.action) {
         Intent.ACTION_SEND -> {
             text = intent.getStringExtra(Intent.EXTRA_TEXT)
             @Suppress("DEPRECATION")
             uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-            if (uri != null &&
-                (mime?.contains("pdf", true) == true || uri.toString()?.endsWith(".pdf") == true)
+            if (uri != null && (mime?.contains("pdf", true) == true ||
+                    uri.toString()?.endsWith(".pdf") == true)
             ) {
                 isPdf = true // Text kommt spaeter aus der PDF-Extraktion
+            } else if (uri != null && text == null && !isTextish(mime, uri)) {
+                isBinary = true // Unbekanntes Format -> als Datei sammeln
             } else if (text == null && uri != null) {
                 val limited = readTextLimited(resolver, uri)
                 text = limited.text
@@ -283,6 +340,8 @@ internal fun extractFromIntent(resolver: android.content.ContentResolver, intent
                 uri = uris.first() // Phase 1: erste Datei genuegt
                 if (mime?.contains("pdf", true) == true || uri.toString().endsWith(".pdf")) {
                     isPdf = true
+                } else if (!isTextish(mime, uri)) {
+                    isBinary = true
                 } else {
                     val limited = readTextLimited(resolver, uri)
                     text = limited.text
@@ -294,7 +353,7 @@ internal fun extractFromIntent(resolver: android.content.ContentResolver, intent
     if (!isPdf && text != null && text.length > MAX_INGEST_CHARS) {
         text = text.substring(0, MAX_INGEST_CHARS)
     }
-    return Extracted(text, mime, uri?.toString(), warning, isPdf)
+    return Extracted(text, mime, uri?.toString(), warning, isPdf, isBinary)
 }
 
 /** Liest Text gestreamt mit Zeichenlimit (kein Voll-Laden grosser Dateien mehr). */
