@@ -53,6 +53,7 @@ import com.heddrich.companion.publish.SummarizeWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -190,10 +191,39 @@ fun InboxScreen(items: List<IngestItem>) {
                             if (isSelected) selected.remove(item.id) else selected.add(item.id)
                         },
                         onOpenWiki = {
-                            if (!item.resultUrl.isNullOrBlank()) {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(item.resultUrl))
-                                )
+                            when {
+                                !item.resultUrl.isNullOrBlank() -> {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse(item.resultUrl))
+                                    )
+                                }
+                                else -> {
+                                    // Server-Modus: beim Antippen die finale Seite
+                                    // suchen (Lookup), Treffer im Eintrag merken,
+                                    // sonst wenigstens ins Buch springen.
+                                    scope.launch {
+                                        val (url, bookUrl) = withContext(Dispatchers.IO) {
+                                            com.heddrich.companion.publish.ServerPublisher.lookupPage(
+                                                context.applicationContext
+                                            )
+                                        }
+                                        if (url != null) {
+                                            dao.update(item.copy(resultUrl = url))
+                                        }
+                                        val target = url ?: bookUrl ?: item.resultUrl
+                                        if (target != null) {
+                                            context.startActivity(
+                                                Intent(Intent.ACTION_VIEW, Uri.parse(target))
+                                            )
+                                        } else {
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "Seite noch nicht gefunden – gleich nochmal versuchen",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                }
                             }
                         },
                         onOpenFile = {
@@ -322,6 +352,9 @@ private fun IngestRow(
                         Button(onClick = onOpenWiki) { Text("Wiki-Seite öffnen") }
                     } else if (!item.rawLocalPath.isNullOrBlank()) {
                         Button(onClick = onOpenFile) { Text("Datei öffnen") }
+                    } else {
+                        // Server-Modus: finale URL erst nach asynchronem Ingest
+                        Button(onClick = onOpenWiki) { Text("Wiki-Seite öffnen") }
                     }
                 }
                     IngestStatus.RUNNING -> {

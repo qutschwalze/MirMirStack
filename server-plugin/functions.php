@@ -21,6 +21,14 @@ function mirmir_cfg(string $key, string $default = ''): string {
     return ($v === false || $v === '') ? $default : $v;
 }
 
+/** Buch-Slug aus der BuchStack-API (static-Cache je Request). */
+function mirmir_book_slug(int $bookId): string {
+    static $cache = [];
+    if (isset($cache[$bookId])) return $cache[$bookId];
+    $book = json_decode(mirmir_api('GET', '/books/' . $bookId), true);
+    return $cache[$bookId] = (string) ($book['slug'] ?? 'books');
+}
+
 use BookStack\Theming\ThemeEvents;
 
 Theme::listen(ThemeEvents::APP_BOOT, function () {
@@ -62,6 +70,40 @@ Theme::listen(ThemeEvents::APP_BOOT, function () {
 
         mirmir_process($text, $template, $title);
         exit;
+    });
+
+    // ── Seiten-Lookup: nach Ingest die finale Wiki-URL liefern ───────────
+    // GET /mirmirstack/page  (Header X-MirMir-Token)
+    // Antwort 200: {"url": "...", "book_url": "..."}
+    // Antwort 404: {"error": "not found", "book_url": "..."} – Seite noch nicht
+    //              angelegt oder aelter; die App kann dann ins Buch springen.
+    \Route::get('/mirmirstack/page', function () {
+        $token = (string) request()->header('X-MirMir-Token', '');
+        if (!hash_equals(mirmir_cfg('MIRMIR_INGEST_TOKEN'), $token)) {
+            return response()->json(['error' => 'unauthorized'], 401);
+        }
+
+        $bookId = (int) mirmir_cfg('MIRMIR_BOOK_ID', '3');
+        $bookSlug = mirmir_book_slug($bookId);
+        $bookUrl = rtrim((string) config('app.url'), '/') . '/books/' . $bookSlug;
+
+        // Die zuletzt angelegten Seiten des Buchs: neueste innerhalb ~15 Min.
+        $pages = json_decode(mirmir_api(
+            'GET', "/pages?count=20&filter[book_id]=$bookId"
+        ), true);
+        $newest = null;
+        foreach (($pages['data'] ?? []) as $p) {
+            $created = strtotime((string) ($p['created_at'] ?? ''));
+            if ($created && time() - $created < 900) {
+                $newest = $p;
+            }
+        }
+        if (!$newest) {
+            return response()->json(['error' => 'not found', 'book_url' => $bookUrl], 404);
+        }
+        $detail = json_decode(mirmir_api('GET', '/pages/' . $newest['id']), true);
+        $pageUrl = $bookUrl . '/page/' . ($detail['slug'] ?? $newest['id']);
+        return response()->json(['url' => $pageUrl, 'book_url' => $bookUrl]);
     });
 });
 

@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.9.0 / 23 (2026-08-27)
+
+**Wiki-Link direkt aus der Inbox (Server-Modus)**
+
+- Plugin-Endpoint `GET /mirmirstack/page`: liefert die finale URL der zuletzt angelegten Seite (neueste im Ziel-Buch, ~15-Minuten-Fenster) plus Buch-URL; Auth über das bestehende Ingest-Token — keine neuen Credentials auf dem Gerät.
+- Inbox: Bei Server-Modus-Einträgen öffnet „Wiki-Seite öffnen" jetzt per Lookup **direkt die entstandene Wiki-Seite**; wird die Seite noch nicht gefunden, springt die App ins Ziel-Buch (Fallback), wiederholt man später, ist die URL im Eintrag dauerhaft gecacht.
+- Geräte-Modus & gesammelte Dateien: unverändert (direkter Link bzw. Datei öffnen).
+
 ## 0.8.1 / 22 (2026-08-27)
 
 **Fix – Quick-Capture war bei leerer Inbox unsichtbar**

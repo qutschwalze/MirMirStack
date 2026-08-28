@@ -6,6 +6,8 @@ import com.heddrich.companion.data.IngestStatus
 import com.heddrich.companion.settings.SettingsStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -95,6 +97,35 @@ object ServerPublisher {
                 202 -> "OK – Server nimmt Anfragen an (202)"
                 401 -> "FEHLER 401 – Token wird abgelehnt"
                 else -> "HTTP ${response.code} – Endpoint antwortet unerwartet"
+            }
+        }
+    }
+
+    /**
+     * Fragt die finale Wiki-URL der zuletzt entstandenen Seite ab
+     * (GET /mirmirstack/page; der Server hat sie nach dem asynchronen
+     * Ingest erzeugt). Liefert (pageUrl, bookUrl) – pageUrl null bei 404,
+     * bookUrl null wenn auch der Buch-Link nicht ermittelbar war.
+     */
+    fun lookupPage(appContext: Context): Pair<String?, String?> {
+        val settings = SettingsStore.Holder.get(appContext)
+        if (!settings.isIngestConfigured) return null to null
+        val base = endpoint(settings.ingestBaseUrl)
+        val pageEndpoint = base.substringBeforeLast("/ingest") + "/page"
+        val request = Request.Builder()
+            .url(pageEndpoint)
+            .header("X-MirMir-Token", settings.ingestToken)
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            fun str(key: String): String? = runCatching {
+                json.parseToJsonElement(body).jsonObject[key]?.jsonPrimitive?.content
+            }.getOrNull()
+            return when {
+                response.code == 200 -> str("url") to str("book_url")
+                response.code == 404 -> null to str("book_url")
+                else -> null to null
             }
         }
     }
