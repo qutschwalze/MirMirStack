@@ -2,6 +2,16 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.9.1 / 24 (2026-08-28)
+
+**Datensammler: Unbekannte Dateien landen jetzt auch im Wiki**
+
+Feldbefund: Geteilte JPGs kamen nur lokal, nicht in BookStack an.
+
+- Neuer Plugin-Endpoint `POST /mirmirstack/upload`: nimmt jede Datei (multipart, Ingest-Token) und hängt sie als Attachment an die Tages-Seite „Gesammelte Dateien YYYY-MM-DD" im Monatskapitel (Seite wird automatisch angelegt); Antwort enthält die Seiten-URL.
+- App: Gesammelte Dateien werden im Server-Modus nach dem lokalen Sichern automatisch hochgeladen; die Inbox-URL und die Notification zeigen direkt auf die Sammel-Seite. Schlägt der Upload fehl, bleibt die Datei lokal gespeichert und der Eintrag zeigt den Grund.
+- Unterwegs gefixt: BookStack-API verlangt beim Attachment-Upload zwingend das Feld `name` (422 sonst) — im Plugin wieder korrekt gesetzt.
+
 ## 0.9.0 / 23 (2026-08-27)
 
 **Wiki-Link direkt aus der Inbox (Server-Modus)**

@@ -190,7 +190,7 @@ suspend fun receiveSharedItem(
                 rawUri = null,
                 mime = extracted.mime,
                 status = IngestStatus.QUEUED,
-                error = "Datei gespeichert (unbekanntes Format)",
+                error = null,
                 resultUrl = null,
                 rawLocalPath = copyPath
             )
@@ -202,7 +202,7 @@ suspend fun receiveSharedItem(
                 rawUri = null,
                 sourcePkg = referrerHost,
                 sourceKind = binItem.sourceKind,
-                warning = "Unbekanntes Format – die Datei wird nur gespeichert und nicht zusammengefasst."
+                warning = "Unbekanntes Format – die Datei wird gespeichert und ins Wiki hochgeladen (ohne Zusammenfassung)."
             )
         }
 

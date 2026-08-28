@@ -10,8 +10,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
@@ -127,6 +129,49 @@ object ServerPublisher {
                 response.code == 404 -> null to str("book_url")
                 else -> null to null
             }
+        }
+    }
+
+    /**
+     * Lädt eine gesammelte Datei (unbekanntes Format) ins Wiki hoch:
+     * POST /mirmirstack/upload (multipart). Der Server haengt sie an die
+     * Tages-Seite „Gesammelte Dateien YYYY-MM-DD“. Liefert die Seiten-URL.
+     */
+    suspend fun uploadCollectedFile(
+        appContext: Context,
+        item: com.heddrich.companion.data.IngestItem
+    ): String {
+        val settings = SettingsStore.Holder.get(appContext)
+        if (!settings.isIngestConfigured) {
+            throw IllegalStateException("Server-Verarbeitung nicht konfiguriert")
+        }
+        val file = java.io.File(
+            item.rawLocalPath ?: throw IllegalStateException("keine lokale Kopie")
+        )
+        if (!file.exists()) throw IllegalStateException("lokale Kopie fehlt")
+        val name = file.name
+        val mime = item.mime ?: "application/octet-stream"
+
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("name", name)
+            .addFormDataPart("file", name, file.asRequestBody(mime.toMediaType()))
+            .build()
+
+        val request = Request.Builder()
+            .url(endpoint(settings.ingestBaseUrl).substringBeforeLast("/ingest") + "/upload")
+            .header("X-MirMir-Token", settings.ingestToken)
+            .post(body)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val respBody = response.body?.string().orEmpty()
+            if (response.code == 200) {
+                return runCatching {
+                    json.parseToJsonElement(respBody).jsonObject["url"]?.jsonPrimitive?.content
+                }.getOrNull() ?: throw IllegalStateException("Server antwortete ohne URL")
+            }
+            throw IllegalStateException("Server-Fehler ${response.code}: ${respBody.take(150)}")
         }
     }
 }

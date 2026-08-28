@@ -29,6 +29,18 @@ function mirmir_book_slug(int $bookId): string {
     return $cache[$bookId] = (string) ($book['slug'] ?? 'books');
 }
 
+/** Monatskapitel im Ziel-Buch sicherstellen (Idempotenz). */
+function mirmir_ensure_chapter(int $bookId, string $name): int {
+    $chapters = json_decode(mirmir_api('GET', "/chapters?count=100&filter[book_id]=$bookId"), true);
+    foreach (($chapters['data'] ?? []) as $c) {
+        if ($c['name'] === $name) return (int) $c['id'];
+    }
+    $created = json_decode(mirmir_api('POST', '/chapters', json_encode([
+        'book_id' => $bookId, 'name' => $name,
+    ])), true);
+    return (int) ($created['id'] ?? 0);
+}
+
 use BookStack\Theming\ThemeEvents;
 
 Theme::listen(ThemeEvents::APP_BOOT, function () {
@@ -104,6 +116,59 @@ Theme::listen(ThemeEvents::APP_BOOT, function () {
         $detail = json_decode(mirmir_api('GET', '/pages/' . $newest['id']), true);
         $pageUrl = $bookUrl . '/page/' . ($detail['slug'] ?? $newest['id']);
         return response()->json(['url' => $pageUrl, 'book_url' => $bookUrl]);
+    });
+
+    // ── Datei-Upload (Datensammler): Unbekannte Formate als Attachment ──
+    // POST /mirmirstack/upload  (multipart: file + name, Header X-MirMir-Token)
+    // Antwort 200: {"status":"ok","url":"…seite…"} – die Datei haengt an der
+    // Tages-Seite „Gesammelte Dateien YYYY-MM-DD“ im Monatskapitel.
+    \Route::post('/mirmirstack/upload', function () {
+        $token = (string) request()->header('X-MirMir-Token', '');
+        if (!hash_equals(mirmir_cfg('MIRMIR_INGEST_TOKEN'), $token)) {
+            return response()->json(['error' => 'unauthorized'], 401);
+        }
+        $file = request()->file('file');
+        if (!$file || !$file->isValid()) {
+            return response()->json(['error' => 'file required'], 422);
+        }
+        $name = preg_replace('/[^A-Za-z0-9._-]/', '_',
+            (string) request()->input('name', $file->getClientOriginalName()));
+        $name = substr((string) $name, 0, 80) ?: 'datei';
+
+        $bookId = (int) mirmir_cfg('MIRMIR_BOOK_ID', '3');
+        $chapterId = mirmir_ensure_chapter($bookId, date('Y-m'));
+        $pageTitle = 'Gesammelte Dateien ' . date('Y-m-d');
+
+        $existing = json_decode(mirmir_api('GET',
+            '/pages?count=5&filter[name]=' . urlencode($pageTitle) .
+            "&filter[chapter_id]=$chapterId"), true);
+        $pageId = (int) ($existing['data'][0]['id'] ?? 0);
+        if (!$pageId) {
+            $created = json_decode(mirmir_api('POST', '/pages', json_encode([
+                'chapter_id' => $chapterId,
+                'name' => $pageTitle,
+                'html' => '<p>Hier landen geteilte Dateien unbekannter Formate (Datensammler).</p>',
+            ])), true);
+            $pageId = (int) ($created['id'] ?? 0);
+        }
+        if (!$pageId) {
+            return response()->json(['error' => 'page creation failed'], 500);
+        }
+        $page = json_decode(mirmir_api('GET', '/pages/' . $pageId), true);
+
+        try {
+            mirmir_api_multipart('/attachments',
+                $file->getRealPath(), $name, $pageId,
+                $file->getMimeType() ?: 'application/octet-stream');
+        } catch (Throwable $ex) {
+            return response()->json(['error' => 'upload failed: ' . $ex->getMessage()], 500);
+        }
+
+        $bookUrl = rtrim((string) config('app.url'), '/') . '/books/' . mirmir_book_slug($bookId);
+        return response()->json([
+            'status' => 'ok',
+            'url' => $bookUrl . '/page/' . ($page['slug'] ?? $pageId),
+        ]);
     });
 });
 
@@ -237,8 +302,8 @@ function mirmir_api(string $method, string $path, ?string $body = null): string 
 }
 
 /** Multipart-Attachment-Upload (Feldname zwingend "file"). */
-function mirmir_api_multipart(string $path, string $filePath, string $fileName, int $pageId): void {
-    $ch = curl_init(mirmir_cfg('MIRMIR_API_BASE', 'http://localhost:6875/api') . $path);
+function mirmir_api_multipart(string $path, string $filePath, string $fileName, int $pageId, string $mime = 'text/plain'): void {
+    $ch = curl_init(mirmir_cfg('MIRMIR_API_BASE', 'http://bookstack/api') . $path);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => [
@@ -246,14 +311,16 @@ function mirmir_api_multipart(string $path, string $filePath, string $fileName, 
             'Accept: application/json',
         ],
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 30,
+        CURLOPT_TIMEOUT => 60,
         CURLOPT_POSTFIELDS => [
-            'file' => new CURLFile($filePath, 'text/plain', $fileName),
+            'file' => new CURLFile($filePath, $mime, $fileName),
             'uploaded_to' => (string)$pageId,
-            'name' => $fileName,
+            'name' => $fileName,   // BookStack-API verlangt das Feld zwingend (422)
         ],
     ]);
-    curl_exec($ch);
+    $res = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    mirmir_log("attach($fileName -> $pageId): HTTP $code " . substr((string)$res, 0, 200));
     curl_close($ch);
 }
 

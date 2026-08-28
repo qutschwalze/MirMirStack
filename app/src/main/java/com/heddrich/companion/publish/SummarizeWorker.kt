@@ -44,23 +44,34 @@ class SummarizeWorker(
         dao.update(item.copy(status = IngestStatus.RUNNING))
 
         // ── SAMMLER: Inhalt nur gespeichert (unbekanntes Format) ────────────
-        // Kein LLM, kein Wiki – die Datei liegt bereits unter rawLocalPath.
+        // Kein LLM – die Datei liegt lokal unter rawLocalPath und wird im
+        // Server-Modus zusaetzlich als Attachment ins Wiki hochgeladen.
+        val settings = SettingsStore.Holder.get(applicationContext)
         if (item.rawText.isNullOrBlank() && !item.rawLocalPath.isNullOrBlank()) {
+            var wikiUrl: String? = null
+            var note: String? = null
+            if (settings.isServerMode && settings.isIngestConfigured) {
+                try {
+                    wikiUrl = ServerPublisher.uploadCollectedFile(applicationContext, item)
+                } catch (e: Exception) {
+                    note = "Datei lokal gespeichert – Wiki-Upload fehlgeschlagen: " +
+                            (e.message?.take(120) ?: e.javaClass.simpleName)
+                }
+            }
             dao.update(
                 item.copy(
                     status = IngestStatus.DONE,
-                    error = null,
-                    resultUrl = null
+                    error = note,
+                    resultUrl = wikiUrl
                 )
             )
             com.heddrich.companion.notify.AppNotifier.publishCollected(
-                applicationContext, item.title ?: "Datei gespeichert"
+                applicationContext, item.title ?: "Datei gespeichert", wikiUrl
             )
             return Result.success()
         }
 
         // ── SERVER-MODUS: nur senden, Wiki macht den Rest ──────────────────
-        val settings = SettingsStore.Holder.get(applicationContext)
         if (settings.isServerMode && settings.isIngestConfigured) {
             try {
                 ServerPublisher.send(applicationContext, id)
