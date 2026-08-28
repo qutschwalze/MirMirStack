@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -35,7 +36,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -132,6 +135,30 @@ fun InboxScreen(items: List<IngestItem>) {
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                item(key = "quick-capture") {
+                    QuickCaptureCard(onCapture = { text ->
+                        scope.launch(Dispatchers.IO) {
+                            val id = dao.insert(
+                                IngestItem(
+                                    createdAt = System.currentTimeMillis(),
+                                    sourcePkg = null,
+                                    sourceKind = com.heddrich.companion.share.SourceKind.OTHER_APP,
+                                    templateId = "universal",
+                                    title = text.lineSequence().firstOrNull().orEmpty().take(40),
+                                    rawText = text,
+                                    rawUri = null,
+                                    mime = "text/plain",
+                                    status = IngestStatus.QUEUED,
+                                    error = null,
+                                    resultUrl = null,
+                                    summaryMd = null,
+                                    rawLocalPath = null
+                                )
+                            )
+                            SummarizeWorker.enqueue(context.applicationContext, id)
+                        }
+                    })
+                }
                 items(items, key = { it.id }) { item ->
                     val isSelected = selected.contains(item.id)
                     IngestRow(
@@ -171,6 +198,41 @@ fun InboxScreen(items: List<IngestItem>) {
                         }
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickCaptureCard(onCapture: (String) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Schnell erfassen – Text einfügen") },
+                minLines = 2,
+                maxLines = 5,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(
+                onClick = {
+                    if (text.isNotBlank()) {
+                        onCapture(text.trim())
+                        text = ""
+                    }
+                },
+                enabled = text.isNotBlank()
+            ) {
+                Text("Erfassen & verarbeiten")
             }
         }
     }

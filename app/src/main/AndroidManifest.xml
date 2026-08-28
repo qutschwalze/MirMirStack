@@ -4,6 +4,9 @@
     <!-- Phase 2: BookStack-API + spaeter LLM-Endpoint -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Phase 5: Fertig-Notification (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".App"
         android:allowBackup="true"

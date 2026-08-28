@@ -64,6 +64,9 @@ class SummarizeWorker(
                     resultUrl = null // Server entscheidet finalen Seitennamen
                 )
             )
+            com.heddrich.companion.notify.AppNotifier.publishDone(
+                applicationContext, item.title, null
+            )
             return Result.success()
         }
         if (settings.isServerMode && !settings.isIngestConfigured) {
@@ -124,6 +127,9 @@ class SummarizeWorker(
         return when (val result = Publisher.publishHtml(applicationContext, item, html, tags)) {
             is PublishResult.Success -> {
                 dao.update(item.copy(status = IngestStatus.DONE, resultUrl = result.wikiUrl, error = null))
+                com.heddrich.companion.notify.AppNotifier.publishDone(
+                    applicationContext, item.title, result.wikiUrl
+                )
                 Result.success()
             }
             is PublishResult.Failure -> {

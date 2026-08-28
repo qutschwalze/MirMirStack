@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.7.0 / 20 (2026-08-27)
+
+**Phase 5 – Fertig-Notification + Quick-Capture**
+
+- **Benachrichtigung bei Fertigstellung:** Nach erfolgreichem Publish erscheint eine Notification mit Titel + Wiki-Link (Geräte-Modus); im Server-Modus „An Server übergeben – Seite entsteht in wenigen Sekunden" mit Öffnen-Aktion auf die Inbox. Android-13+-Berechtigung wird beim ersten Start angefragt.
+- **Quick-Capture:** Eingabefeld oben in der Inbox – Text einfügen, „Erfassen & verarbeiten" → Eintrag landet als QUEUED in der Outbox und wird sofort verarbeitet (ohne Umweg über Share).
+- Kein Credential-Rückholen ins Gerät: Der Server-Modus pollt nicht, die Notification öffnet die Inbox.
+
 ## 0.6.2 / 19 (2026-08-26)
 
 **Fix – deformiertes Vorlagen-Menü im Share-Screen**
