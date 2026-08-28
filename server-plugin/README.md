@@ -7,13 +7,35 @@ Ergebnis, baut HTML mit Tags und legt die Seite im Ziel-Buch ab.
 
 ## Endpoint
 
-    POST /mirmirstack/ingest
+### POST /mirmirstack/ingest
+
     Header: X-MirMir-Token: <MIRMIR_INGEST_TOKEN>
     Body:   {"text": "...", "template": "meeting|research|chat|universal",
              "title": "optional"}
-    Response 202 {"status":"accepted"} – Verarbeitung laeuft asynchron.
+    Response 202 {"status":"accepted"} – Verarbeitung laeuft asynchron
+    (LLM + Seitenanlage). Auth-Fehler -> 401, fehlender Text -> 422.
 
-Auth-Fehler -> 401, fehlender Text -> 422.
+### GET /mirmirstack/page
+
+Liefert nach einem Ingest die finale URL der zuletzt angelegten Seite
+(plus Buch-URL als Fallback). Antwort: {"url","book_url"}; 404 solange
+keine frische Seite existiert. Auth wie oben.
+
+### POST /mirmirstack/upload  (Datensammler)
+
+    multipart: file=<datei>, name=<anzeigename>
+    Response 200 {"status":"ok","url":"…"} 
+
+Haengt die Datei als Attachment an die Tages-Seite „Gesammelte Dateien
+YYYY-MM-DD" (Monatskapitel, wird automatisch angelegt) und aktualisiert
+deren Inhalt: Liste aller Anhaenge mit Link + Groesse.
+
+### GET /mirmirstack/file/{id}  (Inline-Anzeige)
+
+Serviert ein Attachment mit `Content-Disposition: inline` – Bilder und
+PDFs oeffnen direkt im selben Tab statt Download. Der Storage-Pfad
+stammt ausschliesslich aus der eigenen DB (die BookStack-API verbirgt
+ihn bewusst); keine Pfad-Eingaben von aussen.
 
 ## Installation (LinuxServer-Container)
 

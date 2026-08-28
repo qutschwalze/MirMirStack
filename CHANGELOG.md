@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## Server-Plugin 0.2 / 2026-08-28 (App unverändert)
+
+**Sammel-Seite zeigt Dateien im Inhalt + Inline-Anzeige ohne Download**
+
+- `POST /mirmirstack/upload` aktualisiert nach jedem Upload den Seiteninhalt der „Gesammelte Dateien"-Seite: Liste aller Anhänge mit Link und Größe (Größe direkt von der Platte, die API liefert kein size-Feld).
+- Neu: `GET /mirmirstack/file/{id}` — serviert Attachment-Dateien mit `Content-Disposition: inline`: Bilder/PDFs öffnen direkt im selben Tab statt Download. Der Storage-Pfad kommt ausschließlich aus der eigenen DB (die API verbirgt ihn bewusst), kein Nutzer-Pfad-Input.
+- Storage-Auflösung: LSIO-Container speichert Attachments unter `/config/www/files` (Symlink von `storage/uploads/files`); abweichende Deploys via `MIRMIR_STORAGE_ROOT` überschreibbar. Doku in `server-plugin/README.md`.
+
 ## 0.9.1 / 24 (2026-08-28)
 
 **Datensammler: Unbekannte Dateien landen jetzt auch im Wiki**

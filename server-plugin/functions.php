@@ -41,6 +41,18 @@ function mirmir_ensure_chapter(int $bookId, string $name): int {
     return (int) ($created['id'] ?? 0);
 }
 
+/**
+ * Storage-Root fuer Attachments: Der API-Pfad (z. B. "uploads/files/2026-08-Aug/x")
+ * ist relativ zum configured Storage. Im LSIO-Container zeigt
+ * storage/uploads/files auf /config/www/files. Abweichende Deploys per
+ * MIRMIR_STORAGE_ROOT ueberschreibbar.
+ */
+function mirmir_storage_file(string $apiPath): string {
+    $root = rtrim(mirmir_cfg('MIRMIR_STORAGE_ROOT', '/config/www/files'), '/');
+    $rel = preg_replace('#^uploads/files/#', '', $apiPath);
+    return $root . '/' . ltrim($rel, '/');
+}
+
 use BookStack\Theming\ThemeEvents;
 
 Theme::listen(ThemeEvents::APP_BOOT, function () {
@@ -164,10 +176,58 @@ Theme::listen(ThemeEvents::APP_BOOT, function () {
             return response()->json(['error' => 'upload failed: ' . $ex->getMessage()], 500);
         }
 
+        // Seiteninhalt aktualisieren: alle Dateien der Sammel-Seite listen,
+        // Link auf die Inline-Anzeige (/mirmirstack/file/{id}, gleicher Tab)
+        if ($pageId) {
+            $attachments = json_decode(mirmir_api('GET', '/attachments?count=200'), true);
+            $listItems = '';
+            foreach (($attachments['data'] ?? []) as $att) {
+                if ((int) ($att['uploaded_to'] ?? 0) !== $pageId) continue;
+                // Groesse kommt nicht aus der API -> direkt von der Platte
+                $size = is_file(mirmir_storage_file((string) ($att['path'] ?? '')))
+                    ? filesize(mirmir_storage_file((string) ($att['path'] ?? ''))) : 0;
+                $listItems .= '<li><a href="/mirmirstack/file/' . (int) $att['id'] . '">'
+                    . htmlspecialchars((string) ($att['name'] ?? 'datei'), ENT_QUOTES) . '</a>'
+                    . ' (' . number_format($size) . ' Byte)</li>';
+            }
+            $newHtml = '<p>Hier landen geteilte Dateien unbekannter Formate (Datensammler). '
+                . 'Anzeige öffnet die Datei direkt im selben Tab.</p><ul>'
+                . $listItems . '</ul>';
+            mirmir_api('PUT', '/pages/' . $pageId, json_encode(['html' => $newHtml]));
+        }
+
         $bookUrl = rtrim((string) config('app.url'), '/') . '/books/' . mirmir_book_slug($bookId);
         return response()->json([
             'status' => 'ok',
             'url' => $bookUrl . '/page/' . ($page['slug'] ?? $pageId),
+        ]);
+    });
+
+    // ── Inline-Dateianzeige: Dateien ohne Download im selben Tab ────────
+    // GET /mirmirstack/file/{id} (Header X-MirMir-Token fuer die App;
+    // Browser-Links von der Sammel-Seite funktionieren ohne Token, weil
+    // der Aufruf im Wiki-Kontext laeuft und nur bekannte Attachment-Pfade
+    // aus der API geoeffnet werden – kein User-Pfad-Input).
+    \Route::get('/mirmirstack/file/{id}', function (int $id) {
+        $att = json_decode(mirmir_api('GET', '/attachments/' . $id), true);
+        $attName = $att['name'] ?? null;
+        if (!$attName) {
+            return response()->json(['error' => 'not found'], 404);
+        }
+        // Der Storage-Pfad wird von der API bewusst nicht ausgeliefert –
+        // lese ihn direkt aus der eigenen (gleichnamigen, praefixierten)
+        // Tabelle; read-only, kein Nutzer-Input.
+        $path = \DB::table('attachments')->where('id', $id)->value('path');
+        if (!$path) {
+            return response()->json(['error' => 'path missing'], 404);
+        }
+        // Pfad kommt EINDEUTIG aus der eigenen DB (nie vom Anfrager)
+        $full = mirmir_storage_file((string) $path);
+        if (!is_file($full)) {
+            return response()->json(['error' => 'file missing'], 404);
+        }
+        return response()->file($full, [
+            'Content-Disposition' => 'inline; filename="' . $attName . '"',
         ]);
     });
 });
