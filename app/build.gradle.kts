@@ -28,8 +28,8 @@ android {
         applicationId = "com.heddrich.companion"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "0.8.0"
+        versionCode = 22
+        versionName = "0.8.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -110,56 +110,56 @@ fun InboxScreen(items: List<IngestItem>) {
             )
         }
     ) { padding ->
-        if (items.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("Noch keine Einträge.", style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Teile Text oder eine Datei (md/txt/json/pdf), " +
-                            "oder markiere Text und nutze das Auswahlmenü.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item(key = "quick-capture") {
-                    QuickCaptureCard(onCapture = { text ->
-                        scope.launch(Dispatchers.IO) {
-                            val id = dao.insert(
-                                IngestItem(
-                                    createdAt = System.currentTimeMillis(),
-                                    sourcePkg = null,
-                                    sourceKind = com.heddrich.companion.share.SourceKind.OTHER_APP,
-                                    templateId = "universal",
-                                    title = text.lineSequence().firstOrNull().orEmpty().take(40),
-                                    rawText = text,
-                                    rawUri = null,
-                                    mime = "text/plain",
-                                    status = IngestStatus.QUEUED,
-                                    error = null,
-                                    resultUrl = null,
-                                    summaryMd = null,
-                                    rawLocalPath = null
-                                )
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            // Quick-Capture ist IMMER sichtbar – auch bei leerer Inbox
+            QuickCaptureCard(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                onCapture = { text ->
+                    scope.launch(Dispatchers.IO) {
+                        val id = dao.insert(
+                            IngestItem(
+                                createdAt = System.currentTimeMillis(),
+                                sourcePkg = null,
+                                sourceKind = com.heddrich.companion.share.SourceKind.OTHER_APP,
+                                templateId = "universal",
+                                title = text.lineSequence().firstOrNull().orEmpty().take(40),
+                                rawText = text,
+                                rawUri = null,
+                                mime = "text/plain",
+                                status = IngestStatus.QUEUED,
+                                error = null,
+                                resultUrl = null,
+                                summaryMd = null,
+                                rawLocalPath = null
                             )
-                            SummarizeWorker.enqueue(context.applicationContext, id)
-                        }
-                    })
+                        )
+                        SummarizeWorker.enqueue(context.applicationContext, id)
+                    }
                 }
-                items(items, key = { it.id }) { item ->
+            )
+            if (items.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Noch keine Einträge.", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Teile Text oder eine Datei (md/txt/json/pdf), " +
+                                "oder markiere Text und nutze das Auswahlmenü.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(items, key = { it.id }) { item ->
                     val isSelected = selected.contains(item.id)
                     IngestRow(
                         item = item,
@@ -220,13 +220,18 @@ fun InboxScreen(items: List<IngestItem>) {
                 }
             }
         }
+        }
     }
 }
 
 @Composable
-private fun QuickCaptureCard(onCapture: (String) -> Unit) {
+private fun QuickCaptureCard(
+    modifier: Modifier = Modifier,
+    onCapture: (String) -> Unit
+) {
     var text by remember { mutableStateOf("") }
     Card(
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )

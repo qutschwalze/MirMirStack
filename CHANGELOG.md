@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.8.1 / 22 (2026-08-27)
+
+**Fix – Quick-Capture war bei leerer Inbox unsichtbar**
+
+Feldbefund: Nach dem Löschen aller Einträge verschwand auch das Schnellerfassen-Feld — es steckte im Listen-Zweig.
+
+- Quick-Capture-Karte jetzt immer sichtbar (oberhalb von Liste bzw. Leerzustand).
+
 ## 0.8.0 / 21 (2026-08-27)
 
 **Datensammler – alles annehmen, Unbekanntes speichern**
