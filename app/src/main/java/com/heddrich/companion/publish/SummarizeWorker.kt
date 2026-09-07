@@ -81,9 +81,7 @@ class SummarizeWorker(
                 dao.update(item.copy(status = IngestStatus.FAILED, error = e.message?.take(200)))
                 return if (runAttemptCount < MAX_ATTEMPTS && isTransient(e)) Result.retry() else Result.failure()
             }
-            // Der Server verarbeitet asynchron; die App markiert DONE sobald
-            // der POST akzeptiert wurde. Die resultUrl liefert eine spaetere
-            // Notification/Inbox-Refresh (Wiki-Seite ist dort sichtbar).
+            // 202 erhalten: done markieren und 30s spaeter pruefen ob LLM lief
             dao.update(
                 item.copy(
                     status = IngestStatus.DONE,
@@ -94,6 +92,7 @@ class SummarizeWorker(
             com.heddrich.companion.notify.AppNotifier.publishDone(
                 applicationContext, item.title, null
             )
+            com.heddrich.companion.publish.VerifyWorker.enqueue(applicationContext, id)
             return Result.success()
         }
         if (settings.isServerMode && !settings.isIngestConfigured) {

@@ -21,6 +21,30 @@ function mirmir_cfg(string $key, string $default = ''): string {
     return ($v === false || $v === '') ? $default : $v;
 }
 
+/** Status nach jedem Ingest (Erfolg oder Fehler) speichern. */
+function mirmir_set_status(string $status, string $error = '', string $url = '') {
+    $path = __DIR__ . '/ingest-status.json';
+    $log = [];
+    if (is_file($path)) {
+        $log = json_decode(file_get_contents($path), true) ?: [];
+    }
+    array_unshift($log, [
+        'time' => date('c'),
+        'status' => $status,
+        'error' => $error,
+        'url' => $url,
+    ]);
+    file_put_contents($path, json_encode(array_slice($log, 0, 20)));
+}
+
+/** Die letzten N Status-Eintraege (fuer GET /mirmirstack/status). */
+function mirmir_get_status(int $count = 10): array {
+    $path = __DIR__ . '/ingest-status.json';
+    if (!is_file($path)) return [];
+    $log = json_decode(file_get_contents($path), true) ?: [];
+    return array_slice($log, 0, $count);
+}
+
 /** Buch-Slug aus der BuchStack-API (static-Cache je Request). */
 function mirmir_book_slug(int $bookId): string {
     static $cache = [];
@@ -230,6 +254,17 @@ Theme::listen(ThemeEvents::APP_BOOT, function () {
             'Content-Disposition' => 'inline; filename="' . $attName . '"',
         ]);
     });
+
+    // ── Status: letzte Ingest-Ergebnisse fuer App-Polling ──────────────
+    // GET /mirmirstack/status (Header X-MirMir-Token)
+    // Antwort: array von {time, status:"ok"|"error", error, url}
+    \Route::get('/mirmirstack/status', function () {
+        $token = (string) request()->header('X-MirMir-Token', '');
+        if (!hash_equals(mirmir_cfg('MIRMIR_INGEST_TOKEN'), $token)) {
+            return response()->json(['error' => 'unauthorized'], 401);
+        }
+        return response()->json(mirmir_get_status(10));
+    });
 });
 
 // ══════════════════════════════════════════════════════════════════════
@@ -351,8 +386,10 @@ function mirmir_process(string $text, string $template, string $userTitle): void
         @unlink($tmp);
 
         mirmir_log("OK template=$template");
+        mirmir_set_status('ok', '', $pageTitle);
     } catch (Throwable $ex) {
         mirmir_log('ERROR: ' . $ex->getMessage());
+        mirmir_set_status('error', $ex->getMessage());
     }
 }
 

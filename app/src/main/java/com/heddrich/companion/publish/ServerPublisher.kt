@@ -6,6 +6,7 @@ import com.heddrich.companion.data.IngestStatus
 import com.heddrich.companion.settings.SettingsStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -129,6 +130,32 @@ object ServerPublisher {
                 response.code == 404 -> null to str("book_url")
                 else -> null to null
             }
+        }
+    }
+
+    /**
+     * Liest den aktuellen Status vom Server (GET /mirmirstack/status).
+     * Liefert Pair(status, error) oder null bei Netzwerk-Fehler.
+     * Der juengste Eintrag im Array ist der aktuellste Ingest.
+     */
+    fun verifyStatus(appContext: Context): Pair<String, String>? {
+        val settings = SettingsStore.Holder.get(appContext)
+        if (!settings.isIngestConfigured) return null
+        val base = endpoint(settings.ingestBaseUrl)
+        val statusUrl = base.substringBeforeLast("/ingest") + "/status"
+        val request = Request.Builder()
+            .url(statusUrl)
+            .header("X-MirMir-Token", settings.ingestToken)
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (response.code != 200) return null
+            val arr = runCatching { json.parseToJsonElement(body).jsonArray }.getOrNull()
+            if (arr.isNullOrEmpty()) return null
+            val latest = arr[0].jsonObject
+            return (latest["status"]?.jsonPrimitive?.content ?: "unknown") to
+                   (latest["error"]?.jsonPrimitive?.content ?: "")
         }
     }
 

@@ -2,6 +2,16 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.9.2 / 25 (2026-09-07)
+
+**Server-Fehler sichtbar: Verify-Worker (30s-Polling) + Status-Endpoint**
+
+Problem: Bei LLM-Fehlern (ungueltiger Key, Modell nicht erreichbar, 400/500) antwortete der Server sofort 202 — die App hielt den Eintrag fälschlich für DONE. Der Fehler blieb unsichtbar.
+
+- **Plugin:** Speichert den Erfolgs-/Fehlerstatus jedes Ingests in `ingest-status.json` (zuletzt 20 Eintraege); neuer Endpoint `GET /mirmirstack/status` liefert sie.
+- **App:** `VerifyWorker` laeuft 30s nach jedem Server-Ingest, fragt den Status ab. Bei Fehler: Eintrag in der Inbox wird auf FAILED mit Server-Meldung gesetzt + Information-Notification.
+- **Kommentar-Fix:** `x-opencode-session`-Header jetzt auch im Repo dokumentiert und versioniert (die hunderte Zeilen LLM-Fehler im Plugin-Log vor dem Fix dokumentieren den Fehler eindrucksvoll).
+
 ## Server-Plugin 0.2 / 2026-08-28 (App unverändert)
 
 **Sammel-Seite zeigt Dateien im Inhalt + Inline-Anzeige ohne Download**

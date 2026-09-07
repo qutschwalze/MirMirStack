@@ -36,6 +36,27 @@ object AppNotifier {
         }
     }
 
+    /** Fehlgeschlagener LLM-Call auf dem Server — Information-Notification. */
+    fun serverError(context: Context, title: String?, errorMsg: String?) {
+        ensureChannel(context)
+        val contentIntent = PendingIntent.getActivity(
+            context, 0,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_note)
+            .setContentTitle("Server-Fehler: " + (title?.take(40) ?: "Inhalt"))
+            .setContentText(errorMsg?.take(100) ?: "Verarbeitung fehlgeschlagen")
+            .setContentIntent(contentIntent)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(errorMsg?.take(300)))
+            .setAutoCancel(true)
+            .build()
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(NOTIF_ID + 2, notification)
+    }
+
     /**
      * Gesammelte Datei (Datensammler): Mit Wiki-URL oeffnet der Tap direkt
      * die Sammel-Seite; ohne URL die Inbox.
