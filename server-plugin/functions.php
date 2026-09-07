@@ -13,7 +13,7 @@
 
 /**
  * Konfiguration ueber BookStack-.env (keine Secrets im Theme-Code):
- * MIRMIR_INGEST_TOKEN, MIRMIR_LLM_KEY, MIRMIR_API_TOKEN_ID, MIRMIR_API_TOKEN_SECRET
+ * MIRMIR_INGEST_TOKEN, mirmir_cfg("MIRMIR_LLM_KEY", ""), MIRMIR_API_TOKEN_ID, MIRMIR_API_TOKEN_SECRET
  * Optional: mirmir_cfg('MIRMIR_LLM_URL', 'https://opencode.ai/zen/go/v1/chat/completions'), mirmir_cfg('MIRMIR_LLM_MODEL', 'mimo-v2.5'), (int)mirmir_cfg('MIRMIR_BOOK_ID', '3'), mirmir_cfg('MIRMIR_API_BASE', 'http://localhost:6875/api')
  */
 function mirmir_cfg(string $key, string $default = ''): string {
@@ -307,8 +307,8 @@ function mirmir_process(string $text, string $template, string $userTitle): void
                     'response_format' => ['type' => 'json_object'],
                     'temperature' => 0.2,
                 ]);
-                $raw = mirmir_http(MIRMIR_LLM_URL, 'POST', $payload, [
-                    'Authorization: Bearer ' . MIRMIR_LLM_KEY,
+                $raw = mirmir_http(mirmir_cfg("MIRMIR_LLM_URL", ""), 'POST', $payload, [
+                    'Authorization: Bearer ' . mirmir_cfg("MIRMIR_LLM_KEY", ""),
                     'Content-Type: application/json',
                     'x-opencode-session: ' . $sessionId,
                 ], 120);
