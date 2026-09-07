@@ -259,19 +259,24 @@ function mirmir_prompt(string $tpl): string {
 function mirmir_process(string $text, string $template, string $userTitle): void {
     try {
         // 1) LLM aufrufen
-        $payload = json_encode([
-            'model' => mirmir_cfg('MIRMIR_LLM_MODEL', 'mimo-v2.5'),
-            'messages' => [
-                ['role' => 'system', 'content' => mirmir_prompt($template)],
-                ['role' => 'user',   'content' => $text],
-            ],
-            'response_format' => ['type' => 'json_object'],
-            'temperature' => 0.2,
-        ]);
-        $raw = mirmir_http(mirmir_cfg('MIRMIR_LLM_URL', 'https://opencode.ai/zen/go/v1/chat/completions'), 'POST', $payload, [
-            'Authorization: Bearer ' . mirmir_cfg('MIRMIR_LLM_KEY'),
-            'Content-Type: application/json',
-        ], 120);
+                // x-opencode-session: req. seit 2026-09 von opencode-zen; beliebiger
+                // Wert wird akzeptiert (keine Server-Validierung), aber ohne Header
+                // liefert der Gateway 400 MissingSessionID.
+                $sessionId = 'mirmirstack-' . md5((string) microtime(true));
+                $payload = json_encode([
+                    'model' => mirmir_cfg('MIRMIR_LLM_MODEL'),
+                    'messages' => [
+                        ['role' => 'system', 'content' => mirmir_prompt($template)],
+                        ['role' => 'user',   'content' => $text],
+                    ],
+                    'response_format' => ['type' => 'json_object'],
+                    'temperature' => 0.2,
+                ]);
+                $raw = mirmir_http(MIRMIR_LLM_URL, 'POST', $payload, [
+                    'Authorization: Bearer ' . MIRMIR_LLM_KEY,
+                    'Content-Type: application/json',
+                    'x-opencode-session: ' . $sessionId,
+                ], 120);
         $llm = json_decode($raw, true);
         $answer = $llm['choices'][0]['message']['content'] ?? null;
         if (!$answer) throw new Exception('LLM leere Antwort: ' . substr($raw, 0, 200));
