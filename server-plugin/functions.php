@@ -60,7 +60,7 @@ function mirmir_ensure_chapter(int $bookId, string $name): int {
         if ($c['name'] === $name) return (int) $c['id'];
     }
     $created = json_decode(mirmir_api('POST', '/chapters', json_encode([
-        'book_id' => $bookId, 'name' => $name,
+        'book_id' => $bookId, 'name' => $name, 'priority' => 0,
     ])), true);
     return (int) ($created['id'] ?? 0);
 }
@@ -221,6 +221,7 @@ Theme::listen(ThemeEvents::APP_BOOT, function () {
                 'chapter_id' => $chapterId,
                 'name' => $pageTitle,
                 'html' => '<p>Hier landen geteilte Dateien unbekannter Formate (Datensammler).</p>',
+                'priority' => 0,
             ])), true);
             $pageId = (int) ($created['id'] ?? 0);
         }
@@ -475,7 +476,7 @@ function mirmir_process(string $text, string $template, string $userTitle): void
         }
         if (!$chapterId) {
             $created = json_decode(mirmir_api('POST', '/chapters',
-                json_encode(['book_id' => (int)mirmir_cfg('MIRMIR_BOOK_ID', '3'), 'name' => $month])), true);
+                json_encode(['book_id' => (int)mirmir_cfg('MIRMIR_BOOK_ID', '3'), 'name' => $month, 'priority' => 0])), true);
             $chapterId = $created['id'] ?? null;
             if (!$chapterId) throw new Exception('Kapitel konnte nicht angelegt werden');
         }
@@ -486,7 +487,7 @@ function mirmir_process(string $text, string $template, string $userTitle): void
             '/pages?count=10&filter[name]=' . urlencode($pageTitle) . "&filter[chapter_id]=$chapterId"), true);
         $pagePayload = json_encode([
             'chapter_id' => $chapterId, 'name' => $pageTitle,
-            'html' => $html, 'tags' => $tags,
+            'html' => $html, 'tags' => $tags, 'priority' => 0,
         ]);
         if (!empty($existing['data'][0]['id'])) {
             $pid = $existing['data'][0]['id'];

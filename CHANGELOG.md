@@ -2,6 +2,13 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.10.2 / 28 (2026-09-09)
+
+**Fix: Neue Seiten oben statt unten**
+
+- **Server** und **App** legen neue Seiten/Kapitel jetzt mit `priority: 0` an – sie erscheinen direkt oben im Kapitel/Buch. Server verifiziert: Seite 108 steht als erste im Kapitel 2026-09.
+- **App-Fallback** (`BookStackModels`): `PageWriteRequest`/`ChapterCreateRequest` default `priority: 0`.
+
 ## 0.10.1 / 27 (2026-09-09)
 
 **Fix: Markdown-Formatierung & Web-Vorlage nicht wie Meeting**

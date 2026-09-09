@@ -37,7 +37,8 @@ data class ChapterListResponse(
 data class ChapterCreateRequest(
     @SerialName("book_id") val bookId: Int,
     val name: String,
-    val description: String = ""
+    val description: String = "",
+    val priority: Int = 0
 )
 
 @Serializable
@@ -69,7 +70,8 @@ data class PageWriteRequest(
     @SerialName("book_id") val bookId: Int? = null,
     val name: String,
     val html: String,
-    val tags: List<TagDto> = emptyList()
+    val tags: List<TagDto> = emptyList(),
+    val priority: Int? = 0
 )
 
 @Serializable
