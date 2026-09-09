@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.10.1 / 27 (2026-09-09)
+
+**Fix: Markdown-Formatierung & Web-Vorlage nicht wie Meeting**
+
+- **Markdown-Renderer serverseitig repariert:** `summary_md` wurde bisher als `<p>## Heading<br>...` escaped/gebreakt – Überschriften, Listen, `**fett**`/`code` kamen literal an. Neuer `mirmir_md_to_html()` (identisch zu `MdRenderer.kt`): `##`/`###`→`<h2>/<h3>`, `-`→`<ul>`, `1.`→`<ol>`, Checkboxen `☐/☑`, `**`→`<strong>`, `` ` ``→`<code>`. Zukünftige Seiten rendern korrekt als echte HTML-Blöcke.
+- **Web-Vorlage geschärft:** Prompt jetzt explizit „Nicht als Meeting formatieren, keine Entscheidungen/ToDos erfinden“ + Strukturvorgabe (TL;DR, `##` Überschriften, Listen). `typ=web` Tag, Server- und App-Prompts synchronisiert. Meeting bleibt Standard (`defaultFor(UNKNOWN)→meeting`, `BROWSER→web`, Server-Ingest-Default `meeting`).
+- Verifiziert end-to-end (Seite 103: `<h2>`+`<ul>` korrekt, `OK template=web`).
+
 ## 0.10.0 / 26 (2026-09-09)
 
 **Web-Vorlage + Meeting als Standard**

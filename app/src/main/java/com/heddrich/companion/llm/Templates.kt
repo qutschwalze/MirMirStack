@@ -80,10 +80,14 @@ Kein Markdown-Codeblock, kein Text ausserhalb des JSON.""",
     val WEB = Template(
         id = "web",
         displayName = "Webseite",
-        systemPrompt = """Der Nutzer hat eine Webseite geteilt. Du erhältst den extrahierten Text.
-Erstelle eine strukturierte Zusammenfassung auf Deutsch mit den WICHTIGSTEN Punkten,
-Schlüssel-Infos, Anleitungsschritten oder How-Tos (je nach Inhalt). Sortiere nach
-Wichtigkeit, erfasse Kernpunkte klar aber kompakt.
+        systemPrompt = """Der Nutzer hat eine Webseite geteilt. Du erhältst den daraus extrahierten Text.
+Erstelle eine hilfreiche Zusammenfassung AUF DEUTSCH – egal in welcher Sprache der Text ist:
+- Erfasse die WICHTIGSTEN Punkte zuerst (TL;DR in 1-2 Sätzen, falls sinnvoll).
+- Fasse Schlüssel-Infos, HowTos, Anleitungen, Schritte oder Empfehlungen strukturiert
+  als Markdown zusammen (## Überschriften, Listen mit - oder 1.).
+- NICHT als Meeting formatieren: Weder Entscheidungen/ToDos erfinden noch Teilnehmer.
+- Wenn der Text HowTos/Anleitungen enthält: als nummerierte Schritte wiedergeben.
+  Andernfalls: klare thematische Abschnitte.
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt mit genau diesen Feldern:
 {"title": string (kurzer Titel, max 60 Zeichen),
  "summary_md": string (strukturierte Zusammenfassung als Markdown),

@@ -312,6 +312,56 @@ function mirmir_log(string $msg): void {
         FILE_APPEND);
 }
 
+// ── Markdown-Renderer (identisch zu MdRenderer.kt, deterministisch) ──
+function mirmir_md_inline(string $text): string {
+    $esc = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $esc = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $esc);
+    $esc = preg_replace('/`([^`]+)`/', '<code>$1</code>', $esc);
+    return $esc;
+}
+function mirmir_md_to_html(string $md): string {
+    $out = '<div>';
+    $inList = null; // 'ul' | 'ol'
+    $closeList = function () use (&$out, &$inList) {
+        if ($inList !== null) { $out .= "</$inList>"; $inList = null; }
+    };
+    foreach (explode("\n", $md) as $rawLine) {
+        $trimmed = trim(rtrim($rawLine, "\r\n"));
+        // Checkboxen
+        if (preg_match('/^\s*[-*]\s+\[[ xX]\]\s+/', $rawLine)) {
+            if ($inList !== 'ul') { $closeList(); $out .= '<ul>'; $inList = 'ul'; }
+            $text = preg_replace('/^\s*[-*]\s+\[[ xX]\]\s+/', '', $trimmed);
+            $checked = (bool) preg_match('/^\s*[-*]\s+\[[xX]\]/', $rawLine);
+            $out .= '<li>' . ($checked ? '☑ ' : '☐ ') . mirmir_md_inline($text) . '</li>';
+            continue;
+        }
+        if (preg_match('/^\s*[-*]\s+/', $rawLine)) {
+            if ($inList !== 'ul') { $closeList(); $out .= '<ul>'; $inList = 'ul'; }
+            $text = preg_replace('/^\s*[-*]\s+/', '', $trimmed);
+            $out .= '<li>' . mirmir_md_inline($text) . '</li>';
+            continue;
+        }
+        if (preg_match('/^\s*\d+\.\s+/', $rawLine)) {
+            if ($inList !== 'ol') { $closeList(); $out .= '<ol>'; $inList = 'ol'; }
+            $text = preg_replace('/^\s*\d+\.\s+/', '', $trimmed);
+            $out .= '<li>' . mirmir_md_inline($text) . '</li>';
+            continue;
+        }
+        if ($trimmed === '') { $closeList(); continue; }
+        if (str_starts_with($trimmed, '### ')) {
+            $closeList(); $out .= '<h3>' . mirmir_md_inline(substr($trimmed, 4)) . '</h3>';
+        } elseif (str_starts_with($trimmed, '## ')) {
+            $closeList(); $out .= '<h2>' . mirmir_md_inline(substr($trimmed, 3)) . '</h2>';
+        } elseif (str_starts_with($trimmed, '# ')) {
+            $closeList(); $out .= '<h2>' . mirmir_md_inline(substr($trimmed, 2)) . '</h2>';
+        } else {
+            $closeList(); $out .= '<p>' . mirmir_md_inline($trimmed) . '</p>';
+        }
+    }
+    $closeList();
+    return $out . '</div>';
+}
+
 /** System-Prompts je Vorlage (gleiche Struktur wie in der App). */
 function mirmir_prompt(string $tpl): string {
     $fields = '{"title": string (kurz, max 60 Zeichen), '
@@ -325,10 +375,14 @@ function mirmir_prompt(string $tpl): string {
         case 'research': return "Du erstellst Recherche-Zusammenfassungen auf Deutsch.\n$base";
         case 'chat':     return "Du erstellst kompakte Zusammenfassungen von Chatverlaeufen auf Deutsch.\n$base";
         case 'web':
-            return "Der Nutzer hat eine Webseite geteilt. Du erhaeltst den extrahierten Text.\n"
-                . "Erstelle eine strukturierte Zusammenfassung auf Deutsch mit den WICHTIGSTEN Punkten,\n"
-                . "Schluessel-Infos, Anleitungsschritten oder How-Tos (je nach Inhalt). Sortiere nach\n"
-                . "Wichtigkeit, erfasse Kernpunkte klar aber kompakt.\n$base";
+            return "Der Nutzer hat eine Webseite geteilt. Du erhaeltst den daraus extrahierten Text.\n"
+                . "Erstelle eine hilfreiche Zusammenfassung AUF DEUTSCH – egal in welcher Sprache der Text ist:\n"
+                . "- Erfasse die WICHTIGSTEN Punkte zuerst (TL;DR in 1-2 Saetzen, falls sinnvoll).\n"
+                . "- Fasse Schluessel-Infos, HowTos, Anleitungen, Schritte oder Empfehlungen strukturiert\n"
+                . "  als Markdown zusammen (## Ueberschriften, Listen mit - oder 1.).\n"
+                . "- NICHT als Meeting formatieren: Weder Entscheidungen/ToDos erfinden noch Teilnehmer.\n"
+                . "- Wenn der Text HowTos/Anleitungen enthaelt: als nummerierte Schritte wiedergeben.\n"
+                . "  Andernfalls: klare thematische Abschnitte.\n$base";
         default:
             return "Du klassifizierst den Inhalt (Meeting/Recherche/Chat/Web) und erstellst\n"
                 . "eine passende Zusammenfassung auf Deutsch.\n$base";
@@ -385,14 +439,21 @@ function mirmir_process(string $text, string $template, string $userTitle): void
             throw new Exception('Pflichtfelder fehlen (title/summary_md)');
         }
 
-        // 3) HTML bauen (escape + Absaetze; Listen als <ul> grob unterstuetzt)
-        $html = '<p>' . nl2br(htmlspecialchars($sum['summary_md'], ENT_QUOTES)) . '</p>';
-        foreach (['decisions' => 'Entscheidungen', 'todos' => 'To-dos'] as $k => $label) {
-            if (!empty($sum[$k]) && is_array($sum[$k])) {
-                $html .= "<h3>$label</h3><ul>";
-                foreach ($sum[$k] as $it) $html .= '<li>' . htmlspecialchars((string)$it, ENT_QUOTES) . '</li>';
-                $html .= '</ul>';
-            }
+        // 3) HTML bauen (deterministischer Markdown-Renderer)
+        $html = mirmir_md_to_html($sum['summary_md']);
+        $decisions = array_values(array_filter($sum['decisions'] ?? [], fn($v) => trim((string)$v) !== ''));
+        $todos     = array_values(array_filter($sum['todos'] ?? [], fn($v) => trim((string)$v) !== ''));
+        // Entscheidungen/To-dos nur wenn inhaltlich sinnvoll (bei Web ignorieren, wenn leer/kurz)
+        $isWeb = ($template === 'web');
+        if (!empty($decisions) && !($isWeb && count($decisions) === 0)) {
+            $html .= '<h3>Entscheidungen</h3><ul>';
+            foreach ($decisions as $it) $html .= '<li>' . htmlspecialchars((string)$it, ENT_QUOTES) . '</li>';
+            $html .= '</ul>';
+        }
+        if (!empty($todos)) {
+            $html .= '<h3>To-dos</h3><ul>';
+            foreach ($todos as $it) $html .= '<li>' . htmlspecialchars((string)$it, ENT_QUOTES) . '</li>';
+            $html .= '</ul>';
         }
         if (!empty($sum['participants'])) {
             $html .= '<p><em>Teilnehmer: ' . htmlspecialchars(implode(', ', $sum['participants']), ENT_QUOTES) . '</em></p>';
