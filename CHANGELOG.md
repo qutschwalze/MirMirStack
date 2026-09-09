@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.10.0 / 26 (2026-09-09)
+
+**Web-Vorlage + Meeting als Standard**
+
+- **Neue Vorlage „Webseite"** (ID `web`): Teilt man eine URL (z. B. aus dem Browser), erkennt der Server sie, lädt den Seiteninhalt (HTML→Text-Extraktion: Scripte/Styles raus, Überschriften/Absätze erhalten), und fasst mit speziellem Prompt zusammen: wichtigste Punkte, Schlüssel-Infos, Anleitungsschritte/HowTos – sortiert nach Wichtigkeit, klar und kompakt.
+- **Meeting als Standardvorlage**: `Templates.defaultFor()` liefert jetzt für unbekannte Quellen `meeting` (statt `universal`), Browser-URLs gehen auf `web`. Auf dem Server ist `meeting` ebenfalls Default beim Ingest.
+- **App** zeigt die neue „Webseite"-Vorlage in der Auswahl; **Server** hat `web` im Prompt- und Typ-Mapping (`typ=web`) und robusten Fallback wenn der Seitenabruf fehlschlägt.
+
 ## 0.9.2 / 25 (2026-09-07)
 
 **Server-Fehler sichtbar: Verify-Worker (30s-Polling) + Status-Endpoint**

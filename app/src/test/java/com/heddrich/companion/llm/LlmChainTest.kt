@@ -83,7 +83,7 @@ class LlmChainTest {
 
     @Test
     fun `routing picks research for browser`() {
-        assertEquals("research", Templates.defaultFor("BROWSER"))
+        assertEquals("web", Templates.defaultFor("BROWSER"))
     }
 
     @Test
@@ -93,8 +93,8 @@ class LlmChainTest {
     }
 
     @Test
-    fun `unknown source falls back to universal`() {
-        assertEquals("universal", Templates.defaultFor("UNKNOWN"))
+    fun `unknown source falls back to meeting`() {
+        assertEquals("meeting", Templates.defaultFor("UNKNOWN"))
         assertEquals("universal", Templates.byId(null).id)
     }
 

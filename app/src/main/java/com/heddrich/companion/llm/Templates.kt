@@ -77,22 +77,41 @@ Kein Markdown-Codeblock, kein Text ausserhalb des JSON.""",
         defaultTags = listOf("typ=allgemein")
     )
 
+    val WEB = Template(
+        id = "web",
+        displayName = "Webseite",
+        systemPrompt = """Der Nutzer hat eine Webseite geteilt. Du erhältst den extrahierten Text.
+Erstelle eine strukturierte Zusammenfassung auf Deutsch mit den WICHTIGSTEN Punkten,
+Schlüssel-Infos, Anleitungsschritten oder How-Tos (je nach Inhalt). Sortiere nach
+Wichtigkeit, erfasse Kernpunkte klar aber kompakt.
+Antworte AUSSCHLIESSLICH mit einem JSON-Objekt mit genau diesen Feldern:
+{"title": string (kurzer Titel, max 60 Zeichen),
+ "summary_md": string (strukturierte Zusammenfassung als Markdown),
+ "decisions": string[],
+ "todos": string[],
+ "participants": string[],
+ "tags": string[]}
+Kein Markdown-Codeblock, kein Text ausserhalb des JSON.""",
+        defaultTags = listOf("typ=web")
+    )
+
     fun byId(id: String?): Template = when (id) {
         MEETING.id -> MEETING
         RESEARCH.id -> RESEARCH
         CHAT.id -> CHAT
+        WEB.id -> WEB
         else -> UNIVERSAL
     }
 
     /** Vorauswahl nach erkannter Quelle (Routing-Heuristik). */
     fun defaultFor(sourceKind: String): String = when (sourceKind) {
         "SHERPA" -> MEETING.id
-        "BROWSER" -> RESEARCH.id
+        "BROWSER" -> WEB.id
         "WHATSAPP", "EMAIL" -> CHAT.id
-        else -> UNIVERSAL.id
+        else -> MEETING.id
     }
 
-    fun all(): List<Template> = listOf(MEETING, RESEARCH, CHAT, UNIVERSAL)
+    fun all(): List<Template> = listOf(MEETING, RESEARCH, CHAT, WEB, UNIVERSAL)
 }
 
 /**

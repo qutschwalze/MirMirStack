@@ -16,7 +16,7 @@ class WikiTemplateLoaderTest {
         val (merged, warning) = WikiTemplateLoader.merge(defaults, html)
 
         assertNull(warning)
-        assertEquals(4, merged.size)
+        assertEquals(5, merged.size)
         val meeting = merged.first { it.id == "meeting" }
         assertEquals("Mein Protokoll", meeting.displayName)
         assertEquals("Neuer Prompt", meeting.systemPrompt)
@@ -30,7 +30,7 @@ class WikiTemplateLoaderTest {
         val (merged, warning) = WikiTemplateLoader.merge(defaults, html)
 
         assertNull(warning)
-        assertEquals(5, merged.size)
+        assertEquals(6, merged.size)
         val standup = merged.firstOrNull { it.id == "standup" }
         assertNotNull(standup)
         assertEquals(listOf("typ=standup"), standup!!.defaultTags)

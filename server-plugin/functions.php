@@ -77,6 +77,43 @@ function mirmir_storage_file(string $apiPath): string {
     return $root . '/' . ltrim($rel, '/');
 }
 
+// ── URL-Erkennung + Inhalts-Extraktion (fuer web-Vorlage) ──────────
+/** Prueft ob Text hauptsaechlich eine URL ist. */
+function mirmir_is_url(string $text): bool {
+    return (bool) preg_match('/^https?:\/\/\S+$/i', trim($text));
+}
+
+/** Holt den Inhalt einer Webseite und extrahiert lesbaren Text. */
+function mirmir_fetch_webpage(string $url, int $maxChars = 100000): string {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 MirMirStack/1.0 (+https://github.com/qutschwalze/MirMirStack)',
+        CURLOPT_HTTPHEADER => ['Accept: text/html', 'Accept-Language: de,en;q=0.9'],
+    ]);
+    $html = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($code >= 400 || !$html) {
+        throw new Exception("Webseite nicht abrufbar (HTTP $code)");
+    }
+    $text = preg_replace('/<script[^>]*>.*?<\/script>/is', '', $html);
+    $text = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $text);
+    $text = preg_replace('/<h([1-6])[^>]*>(.*?)<\/h\1>/i', "\n## $2\n", $text);
+    $text = preg_replace('/<br\s*\/?>/i', "\n", $text);
+    $text = preg_replace('/<\/?(p|div|li|tr|article|section)[^>]*>/i', "\n", $text);
+    $text = strip_tags($text);
+    $text = html_entity_decode($text, ENT_QUOTES);
+    $text = preg_replace('/[ \t]+/', ' ', $text);
+    $text = preg_replace('/\n{3,}/', "\n\n", trim($text));
+    if (mb_strlen($text) < 100) {
+        throw new Exception("Webseite enthaelt keinen brauchbaren Text");
+    }
+    return mb_substr($text, 0, $maxChars);
+}
+
 use BookStack\Theming\ThemeEvents;
 
 Theme::listen(ThemeEvents::APP_BOOT, function () {
@@ -100,7 +137,7 @@ Theme::listen(ThemeEvents::APP_BOOT, function () {
         if (mb_strlen($text) > 300000) {
             $text = mb_substr($text, 0, 300000);
         }
-        if (!in_array($template, ['meeting', 'research', 'chat', 'universal'], true)) {
+        if (!in_array($template, ['meeting', 'research', 'chat', 'web', 'universal'], true)) {
             $template = 'universal';
         }
 
@@ -284,34 +321,57 @@ function mirmir_prompt(string $tpl): string {
     $base = "Antworte AUSSCHLIESSLICH mit einem JSON-Objekt mit genau diesen Feldern:\n$fields\n"
           . "Kein Markdown-Codeblock, kein Text ausserhalb des JSON.";
     switch ($tpl) {
+        case 'meeting':  return "Du erstellst praezise Meeting-Protokolle auf Deutsch.\n$base";
         case 'research': return "Du erstellst Recherche-Zusammenfassungen auf Deutsch.\n$base";
         case 'chat':     return "Du erstellst kompakte Zusammenfassungen von Chatverlaeufen auf Deutsch.\n$base";
-        case 'meeting':  return "Du erstellst praezise Meeting-Protokolle auf Deutsch.\n$base";
-        default:         return "Du klassifizierst den Inhalt (Meeting/Recherche/Chat) und erstellst eine passende Zusammenfassung auf Deutsch.\n$base";
+        case 'web':
+            return "Der Nutzer hat eine Webseite geteilt. Du erhaeltst den extrahierten Text.\n"
+                . "Erstelle eine strukturierte Zusammenfassung auf Deutsch mit den WICHTIGSTEN Punkten,\n"
+                . "Schluessel-Infos, Anleitungsschritten oder How-Tos (je nach Inhalt). Sortiere nach\n"
+                . "Wichtigkeit, erfasse Kernpunkte klar aber kompakt.\n$base";
+        default:
+            return "Du klassifizierst den Inhalt (Meeting/Recherche/Chat/Web) und erstellst\n"
+                . "eine passende Zusammenfassung auf Deutsch.\n$base";
     }
 }
 
 function mirmir_process(string $text, string $template, string $userTitle): void {
     try {
+        // URL-Erkennung: Wenn der Text eine URL ist, Inhalt holen (Fallback: Originaltext)
+        $displayText = $text;
+        if (mirmir_is_url($text)) {
+            mirmir_log("URL erkannt: $text – lade Inhalt...");
+            try {
+                $displayText = mirmir_fetch_webpage($text);
+                $textSummary = mb_substr($displayText, 0, 120);
+                mirmir_log("Webseite-Inhalt geladen (" . mb_strlen($displayText) . " Zeichen)");
+            } catch (Throwable $fe) {
+                mirmir_log("Webseite-Fetch fehlgeschlagen: " . $fe->getMessage() . " – nutze URL als Text");
+                $displayText = "Webseite: $text\n\n(Hinweis: Inhalt konnte nicht automatisch geladen werden)\n$text";
+            }
+            if ($template !== 'web') {
+                $template = 'web';
+            }
+        }
         // 1) LLM aufrufen
-                // x-opencode-session: req. seit 2026-09 von opencode-zen; beliebiger
-                // Wert wird akzeptiert (keine Server-Validierung), aber ohne Header
-                // liefert der Gateway 400 MissingSessionID.
-                $sessionId = 'mirmirstack-' . md5((string) microtime(true));
-                $payload = json_encode([
-                    'model' => mirmir_cfg('MIRMIR_LLM_MODEL'),
-                    'messages' => [
-                        ['role' => 'system', 'content' => mirmir_prompt($template)],
-                        ['role' => 'user',   'content' => $text],
-                    ],
-                    'response_format' => ['type' => 'json_object'],
-                    'temperature' => 0.2,
-                ]);
-                $raw = mirmir_http(mirmir_cfg("MIRMIR_LLM_URL", ""), 'POST', $payload, [
-                    'Authorization: Bearer ' . mirmir_cfg("MIRMIR_LLM_KEY", ""),
-                    'Content-Type: application/json',
-                    'x-opencode-session: ' . $sessionId,
-                ], 120);
+        // x-opencode-session: req. seit 2026-09 von opencode-zen; beliebiger
+        // Wert wird akzeptiert (keine Server-Validierung), aber ohne Header
+        // liefert der Gateway 400 MissingSessionID.
+        $sessionId = 'mirmirstack-' . md5((string) microtime(true));
+        $payload = json_encode([
+            'model' => mirmir_cfg('MIRMIR_LLM_MODEL'),
+            'messages' => [
+                ['role' => 'system', 'content' => mirmir_prompt($template)],
+                ['role' => 'user',   'content' => $displayText],
+            ],
+            'response_format' => ['type' => 'json_object'],
+            'temperature' => 0.2,
+        ]);
+        $raw = mirmir_http(mirmir_cfg("MIRMIR_LLM_URL", ""), 'POST', $payload, [
+            'Authorization: Bearer ' . mirmir_cfg("MIRMIR_LLM_KEY", ""),
+            'Content-Type: application/json',
+            'x-opencode-session: ' . $sessionId,
+        ], 120);
         $llm = json_decode($raw, true);
         $answer = $llm['choices'][0]['message']['content'] ?? null;
         if (!$answer) throw new Exception('LLM leere Antwort: ' . substr($raw, 0, 200));
@@ -340,7 +400,7 @@ function mirmir_process(string $text, string $template, string $userTitle): void
 
         // 4) Tags: typ + quelle(unbekannt serverseitig) + thema + person
         $tags = [];
-        $typMap = ['meeting' => 'meeting', 'research' => 'recherche', 'chat' => 'chat', 'universal' => 'allgemein'];
+        $typMap = ['meeting' => 'meeting', 'research' => 'recherche', 'chat' => 'chat', 'web' => 'web', 'universal' => 'allgemein'];
         $tags[] = ['name' => 'typ', 'value' => $typMap[$template] ?? 'allgemein'];
         foreach (($sum['tags'] ?? []) as $t)        $tags[] = ['name' => 'thema', 'value' => (string)$t];
         foreach (($sum['participants'] ?? []) as $p) $tags[] = ['name' => 'person', 'value' => (string)$p];
