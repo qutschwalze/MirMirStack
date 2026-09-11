@@ -2,6 +2,12 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## 0.10.3 / 29 (2026-09-10)
+
+**Meeting-Notizen ausführlicher**
+
+- Meeting-Vorlage (App + Server) jetzt auf ausführlich umgestellt: alle wichtigen Themen/Argumente/Zahlen bewahren, pro Agenda-Punkt ## Überschrift + 2-5 Sätze + Listen, typisch 40% Originallänge statt starker Kürzung. Prompt synchron in `Templates.kt` und `functions.php`.
+
 ## 0.10.2 / 28 (2026-09-09)
 
 **Fix: Neue Seiten oben statt unten**

@@ -19,10 +19,17 @@ object Templates {
     val MEETING = Template(
         id = "meeting",
         displayName = "Meeting-Protokoll",
-        systemPrompt = """Du erstellst praezise Meeting-Protokolle auf Deutsch.
+        systemPrompt = """Du erstellst ausführliche, strukturierte Meeting-Protokolle auf Deutsch.
+Ziel: Vollständig aber lesbar – NICHT stark kürzen, alle wesentlichen Inhalte bewahren.
+Anweisungen für summary_md:
+- Erfasse ALLE wichtigen Themen, Diskussionsverläufe, Argumente, Zahlen/Fakten, Kontext und offene Fragen.
+- Strukturiere pro Agenda-Punkt/Thema mit ## Überschrift, darunter 2-5 Sätze Fließtext + Listen wo sinnvoll.
+- Schreibe ausführlich: typisch 400-1200 Wörter je nach Input-Länge, mindestens ~40% der Originallänge, lieber zu detailliert als zu knapp.
+- Bewahre konkrete Details: Namen, Termine, Verantwortlichkeiten, Beträge, Fristen.
+- decisions und todos vollständig und separat erfassen.
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt mit genau diesen Feldern:
-{"title": string (kurze praegnante Titel, max 60 Zeichen, keine DatumPraefixe),
- "summary_md": string (Markdown-Zusammenfassung: Absaetze, Listen erlaubt),
+{"title": string (kurzer prägnanter Titel, max 60 Zeichen, keine Datumpräfixe),
+ "summary_md": string (ausführliche Markdown-Zusammenfassung wie oben beschrieben),
  "decisions": string[] (getroffene Entscheidungen; leer falls keine),
  "todos": string[] (Aufgaben mit Verantwortlichen falls erkennbar),
  "participants": string[] (genannte Teilnehmer/Namen),
