@@ -507,6 +507,22 @@ function mirmir_process(string $text, string $template, string $userTitle): void
         $llm = json_decode($raw, true);
         $answer = $llm['choices'][0]['message']['content'] ?? null;
         if (!$answer) throw new Exception('LLM leere Antwort: ' . substr($raw, 0, 200));
+        // Roh-Log: vollständige LLM-Antwort je Ingest (Forensik bei
+        // Fremd-Halluzinationen – Rotation auf die letzten 20 Dateien).
+        try {
+            $rawDir = __DIR__ . '/llm-raw';
+            if (!is_dir($rawDir)) @mkdir($rawDir, 0755, true);
+            $rawFile = $rawDir . '/' . date('Ymd-His') . '-' . substr(md5((string) microtime(true)), 0, 8) . '.json';
+            @file_put_contents($rawFile, json_encode([
+                'time' => date('c'),
+                'model' => mirmir_cfg('MIRMIR_LLM_MODEL'),
+                'session' => $sessionId,
+                'answer' => $answer,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+            $all = glob($rawDir . '/*.json') ?: [];
+            rsort($all);
+            foreach (array_slice($all, 20) as $old) @unlink($old);
+        } catch (Throwable $rl) { /* Roh-Log darf den Ingest nie brechen */ }
 
         // 2) JSON extrahieren (tolerant gegen Codefences)
         $clean = trim(preg_replace('/^```(?:json)?|```$/m', '', trim($answer)));
