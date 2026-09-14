@@ -436,7 +436,10 @@ function mirmir_prompt(string $tpl): string {
         . '"decisions": string[], "todos": string[], '
         . '"participants": string[], "tags": string[] (2-5 thematische Tags)}';
     $base = "Antworte AUSSCHLIESSLICH mit einem JSON-Objekt mit genau diesen Feldern:\n$fields\n"
-          . "Kein Markdown-Codeblock, kein Text ausserhalb des JSON.";
+          . "Kein Markdown-Codeblock, kein Text ausserhalb des JSON.\n"
+          . "SPRACHE: AUSSCHLIESSLICH Deutsch (German) – title, summary_md, decisions, todos, "
+          . "participants und tags IMMER auf Deutsch, NIEMALS auf Schwedisch oder einer anderen "
+          . "Sprache, egal in welcher Sprache der Input ist. Reply EXCLUSIVELY in German.";
     switch ($tpl) {
         case 'meeting':
             return "Du erstellst ausführliche, strukturierte Meeting-Protokolle auf Deutsch.\n"
