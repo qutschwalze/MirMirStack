@@ -8,11 +8,15 @@ Der Service ist zustandslos. Die Token-Zaehler laufen global weiter,
 dadurch sind Tokens ueber Chunks und Requests hinweg eindeutig, und die
 Deobfuscation in der Theme-Plugin-Datei findet jedes Original exakt.
 
+Sprachen: de (de_core_news_md) und en (en_core_web_md); der Client waehlt
+per "language". Pattern-Recognizer (Email/Telefon/Secrets/...) sind
+sprachunabhaengig und je Sprache registriert.
+
 Endpoints:
-  POST /obfuscate    {"text", "language": "de", "score_threshold"?}
+  POST /obfuscate    {"text", "language": "de"|"en", "score_threshold"?}
                      -> {"obfuscated_text", "mappings": {TOKEN: original}, "token_count"}
   POST /deobfuscate  {"text", "mappings"} -> {"text"}   (Pilot/Roundtrip-Tests)
-  GET  /health       -> {"status": "ok", "model", "threshold", "token_counter", ...}
+  GET  /health       -> {"status": "ok", "models", "threshold", "token_counter", ...}
 """
 import logging
 import os
@@ -38,7 +42,9 @@ from presidio_analyzer import Pattern, PatternRecognizer
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("pii-obfuscator")
 
-MODEL = os.environ.get("PII_MODEL", "de_core_news_md")
+MODEL_DE = os.environ.get("PII_MODEL_DE", "de_core_news_md")
+MODEL_EN = os.environ.get("PII_MODEL_EN", "en_core_web_md")
+LANGUAGES = ("de", "en")
 DEFAULT_THRESHOLD = float(os.environ.get("PII_THRESHOLD", "0.5"))
 
 # Entity-Typ (Presidio) -> Kurzname fuer Tokens: PERSON_1, EMAIL_1, ORT_1...
@@ -56,11 +62,13 @@ ENTITY_SHORT = {
     "PASSWORD": "SECRET",
 }
 
-_DE_PHONE_PATTERNS = [
+_PHONE_PATTERNS = [
     # Internationale deutsche Nummer: +49 / 0049, endet auf Ziffer
     Pattern("de_phone_intl", r"(?<!\d)(?:\+49|0049)[\d\s\/\-\(\)]{7,14}\d(?!\d)", 0.85),
     # Lokale Nummer: 0 + Vorwahl, optional Trenner, 5-10 Ziffern
     Pattern("de_phone_local", r"(?<!\d)0\d{2,4}[\s\/\-]?\d{5,10}(?!\d)", 0.7),
+    # Generische internationale Nummer (+1, +43, ...) fuer en/de
+    Pattern("intl_phone", r"(?<!\d)\+\d{1,3}[\d\s\/\-\(\)]{6,14}\d(?!\d)", 0.8),
 ]
 
 # API-Keys/Tokens mit bekanntem Praefix (hohe Treffsicherheit)
@@ -98,30 +106,38 @@ def _next_token() -> int:
 
 
 def _build_engine() -> AnalyzerEngine:
-    log.info("Initialisiere SpacyNlpEngine model=%s ...", MODEL)
-    nlp_engine = SpacyNlpEngine(models=[{"lang_code": "de", "model_name": MODEL}])
-    registry = RecognizerRegistry(supported_languages=["de"])
-    for cls in (EmailRecognizer, PhoneRecognizer, IpRecognizer, UrlRecognizer,
-                CreditCardRecognizer, IbanRecognizer):
-        registry.add_recognizer(cls(supported_language="de"))
-    registry.add_recognizer(SpacyRecognizer(supported_language="de"))
-    registry.add_recognizer(PatternRecognizer(
-        supported_entity="PHONE_NUMBER", supported_language="de", name="PhoneDE",
-        patterns=_DE_PHONE_PATTERNS))
-    registry.add_recognizer(PatternRecognizer(
-        supported_entity="API_KEY", supported_language="de", name="SecretKey",
-        patterns=_SECRET_KEY_PATTERNS))
-    registry.add_recognizer(PatternRecognizer(
-        supported_entity="PASSWORD", supported_language="de", name="SecretKV",
-        patterns=_SECRET_KV_PATTERNS))
+    log.info("Initialisiere SpacyNlpEngine models=%s/%s ...", MODEL_DE, MODEL_EN)
+    nlp_engine = SpacyNlpEngine(models=[
+        {"lang_code": "de", "model_name": MODEL_DE},
+        {"lang_code": "en", "model_name": MODEL_EN},
+    ])
+    registry = RecognizerRegistry(supported_languages=list(LANGUAGES))
+    # Sprachunabhaengige Pattern-Recognizer je Sprache registrieren
+    for lang in LANGUAGES:
+        for cls in (EmailRecognizer, PhoneRecognizer, IpRecognizer, UrlRecognizer,
+                    CreditCardRecognizer, IbanRecognizer):
+            registry.add_recognizer(cls(supported_language=lang))
+        registry.add_recognizer(PatternRecognizer(
+            supported_entity="PHONE_NUMBER", supported_language=lang, name="PhoneIntl",
+            patterns=_PHONE_PATTERNS))
+        registry.add_recognizer(PatternRecognizer(
+            supported_entity="API_KEY", supported_language=lang, name="SecretKey",
+            patterns=_SECRET_KEY_PATTERNS))
+        registry.add_recognizer(PatternRecognizer(
+            supported_entity="PASSWORD", supported_language=lang, name="SecretKV",
+            patterns=_SECRET_KV_PATTERNS))
+    # SpacyRecognizer je Sprache explizit (AnalyzerEngine ergaenzt ihn nur
+    # bei LEERER Registry - hier ist sie gefuellt).
+    for lang in LANGUAGES:
+        registry.add_recognizer(SpacyRecognizer(supported_language=lang))
     return AnalyzerEngine(registry=registry, nlp_engine=nlp_engine,
-                          supported_languages=["de"],
+                          supported_languages=list(LANGUAGES),
                           default_score_threshold=DEFAULT_THRESHOLD)
 
 
 log.info("Lade Presidio (Init dauert einige Sekunden) ...")
 analyzer = _build_engine()
-log.info("Presidio bereit (model=%s)", MODEL)
+log.info("Presidio bereit (models=%s/%s)", MODEL_DE, MODEL_EN)
 
 
 class ObfuscateReq(BaseModel):
@@ -135,7 +151,7 @@ class DeobfuscateReq(BaseModel):
     mappings: dict[str, str]
 
 
-app = FastAPI(title="pii-obfuscator", version="0.4.0")
+app = FastAPI(title="pii-obfuscator", version="0.5.0")
 
 
 @app.exception_handler(Exception)
@@ -146,20 +162,22 @@ async def _unhandled(req: Request, exc: Exception):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": MODEL,
+    return {"status": "ok", "models": [MODEL_DE, MODEL_EN],
+            "languages": list(LANGUAGES),
             "threshold": DEFAULT_THRESHOLD,
             "token_counter": _token_counter}
 
 
 @app.post("/obfuscate")
 def obfuscate(req: ObfuscateReq):
+    lang = req.language if req.language in LANGUAGES else "de"
     threshold = req.score_threshold if req.score_threshold is not None else DEFAULT_THRESHOLD
     text = req.text
-    results = analyzer.analyze(text=text, language=req.language, score_threshold=threshold)
+    results = analyzer.analyze(text=text, language=lang, score_threshold=threshold)
     if not results:
         return {"obfuscated_text": text, "mappings": {}, "token_count": 0}
     obf, mappings = _tokenize(text, results)
-    log.info("obfuscate: %d hits -> %d tokens (len=%d)", len(results), len(mappings), len(text))
+    log.info("obfuscate(%s): %d hits -> %d tokens (len=%d)", lang, len(results), len(mappings), len(text))
     return {"obfuscated_text": obf, "mappings": mappings, "token_count": len(mappings)}
 
 
@@ -171,18 +189,20 @@ def deobfuscate(req: DeobfuscateReq):
 def _tokenize(text: str, results) -> tuple[str, dict]:
     """Ersetzt Erkanntes durch global eindeutige Tokens; Mappings Token->Original.
 
-    Overlap-Dedupe (hoeherer Score behaelt; bei Gleichstand laengere Span),
-    dann Text aus Original-Spannen neu zusammensetzen. Kein Presidio-Anonymizer
-    noetig, dadurch exakte Positionen und kontrollierte Token-Namen.
+    Overlap-Dedupe: gezielte Pattern-Recognizer schlagen spaCy-NER (geraten),
+    innerhalb einer Klasse hoeherer Score zuerst; dann Text aus Original-Spannen
+    neu zusammensetzen. Kein Presidio-Anonymizer noetig, dadurch exakte
+    Positionen und kontrollierte Token-Namen.
     """
-    # Overlap-Dedupe: gezielte Pattern-Recognizer schlagen spaCy-NER
-    # (geraten), innerhalb einer Klasse hoeherer Score zuerst.
     def _is_spacy(r):
         md = getattr(r, "recognition_metadata", None) or {}
         return md.get("recognizer_name") == "SpacyRecognizer"
 
     ranked = sorted(results, key=lambda r: (_is_spacy(r),
                                             -r.score, r.start, -(r.end - r.start)))
+    # Nur Whitelist-Typen (ENTITY_SHORT) tokenisieren; alles andere
+    # (z. B. DATE_TIME, Alter) bleibt unangetastet im Text.
+    ranked = [r for r in ranked if r.entity_type in ENTITY_SHORT]
     kept = []
     for r in ranked:
         if any(r.start < k.end and k.start < r.end for k in kept):

@@ -2,6 +2,15 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## server-plugin 0.5 (2026-09-16)
+
+**Zwei Sprachen: englische Meetings korrekt gefiltert**
+
+- pii-obfuscator 0.5.0: `en_core_web_md` neben `de_core_news_md` geladen; `/obfuscate` akzeptiert `language=de|en`; alle Pattern-Recognizer je Sprache registriert; generisches Intl-Telefon-Pattern (`+1 …`) ergänzt.
+- `functions.php`: `mirmir_pii_language()` wählt die Sprache per Häufigkeits-Heuristik (de/en) für jeden Ingest.
+- **Entity-Whitelist** im Token-Builder: nur PII-Typen werden ersetzt — Datumsangaben, Alter etc. bleiben dem LLM erhalten (en-spaCy liefert z. B. `DATE_TIME`).
+- Verifiziert: EN-Test-Ingest (Log „PII sprache: en", Roh-Log nur Tokens, kein Klartext), DE-Regression, Roundtrips exakt.
+
 ## server-plugin 0.4 (2026-09-16)
 
 **API-Keys & Passwörter werden vor dem LLM-Call ersetzt**

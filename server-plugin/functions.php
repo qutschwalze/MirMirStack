@@ -472,9 +472,28 @@ function mirmir_prompt(string $tpl): string {
  * Chunks a 8k). Gibt ['text' => obfuskiert, 'mappings' => [Token => Original]]
  * oder null bei Service-Fehler (fail open, Warnung im Log). Mappings nur RAM.
  */
+
+/** Grobe Sprachwahl de|en ueber Haeufigkeitszaehler (Stichprobe 5k). */
+function mirmir_pii_language(string $text): string {
+    $sample = mb_substr($text, 0, 5000);
+    $de = ['und', 'der', 'die', 'das', 'ist', 'mit', 'ich', 'du', 'wir', 'nicht',
+           'ein', 'eine', 'auf', 'fuer', 'auch', 'bei', 'von', 'sind', 'haben'];
+    $en = ['and', 'the', 'is', 'to', 'of', 'with', 'you', 'we', 'they', 'not',
+           'this', 'that', 'for', 'from', 'about', 'are', 'was', 'have', 'it'];
+    $cde = 0;
+    $cen = 0;
+    foreach (preg_split('/\s+/u', mb_strtolower($sample)) ?: [] as $w) {
+        if (in_array($w, $de, true)) $cde++;
+        if (in_array($w, $en, true)) $cen++;
+    }
+    return $cen > $cde ? 'en' : 'de';
+}
+
 function mirmir_pii_obfuscate(string $text): ?array {
     $base = rtrim(mirmir_cfg('MIRMIR_PII_URL', 'http://pii-obfuscator:8001'), '/');
     $threshold = (float) mirmir_cfg('MIRMIR_PII_THRESHOLD', '0.5');
+    $lang = mirmir_pii_language($text);
+    mirmir_log("PII sprache: $lang");
     $chunkSize = 8000;
     $chunks = [];
     while (mb_strlen($text) > 0) {
@@ -487,7 +506,7 @@ function mirmir_pii_obfuscate(string $text): ?array {
     foreach ($chunks as $chunk) {
         $payload = json_encode([
             'text' => $chunk,
-            'language' => 'de',
+            'language' => $lang,
             'score_threshold' => $threshold,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         try {
