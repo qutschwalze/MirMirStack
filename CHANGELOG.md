@@ -2,6 +2,15 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## server-plugin 0.3 (2026-09-16)
+
+**Variante B: PII-Tokenisierung vor dem LLM-Call**
+
+- Neuer PII-Obfuscator-Service (separater Container, Presidio + `de_core_news_md`, `server-plugin/pii-obfuscator/`): ersetzt vor jedem LLM-Call erkannte Personen, E-Mails, Telefonnummern, Orte, Organisationen, IPs, URLs, Karten- und IBAN-Nummern durch eindeutige Tokens (`PERSON_1`, `EMAIL_1`, `ORT_1`, ...). Erkennung auf Deutsch, Standard-Schwellwert 0.5.
+- `functions.php`: Eingabetext wird in 8k-Zeichen-Chunks obfuskiert, Mappings bleiben nur im RAM; Prompt-Anweisung „Tokens woertlich uebernehmen, keine Namen erfinden". Nach der Antwort werden Tokens serverseitig zurueckgesetzt — die Wiki-Seite zeigt echte Namen, das Roh-Log (`llm-raw/`) speichert nur die tokenisierte Antwort.
+- Fail-open: Ist der Service nicht erreichbar, laeuft der Ingest unfiltriert weiter (Warnung im Log). Konfiguration optional per env: `MIRMIR_PII_URL`, `MIRMIR_PII_THRESHOLD`, `MIRMIR_PII_ENABLED`.
+- Verifiziert end-to-end: Test-Ingest — Roh-Log ohne Klartext (nur Tokens), Wiki-Seite vollstaendig deobfuskiert (Namen, Teilnehmer-Tags), Deobfuscation-Roundtrip exakt.
+
 ## 0.10.3 / 29 (2026-09-10)
 
 **Meeting-Notizen ausführlicher**

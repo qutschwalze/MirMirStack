@@ -467,6 +467,60 @@ function mirmir_prompt(string $tpl): string {
     }
 }
 
+/**
+ * PII Variante B: Text vor dem LLM-Call obfuskieren (Presidio-Service,
+ * Chunks a 8k). Gibt ['text' => obfuskiert, 'mappings' => [Token => Original]]
+ * oder null bei Service-Fehler (fail open, Warnung im Log). Mappings nur RAM.
+ */
+function mirmir_pii_obfuscate(string $text): ?array {
+    $base = rtrim(mirmir_cfg('MIRMIR_PII_URL', 'http://pii-obfuscator:8001'), '/');
+    $threshold = (float) mirmir_cfg('MIRMIR_PII_THRESHOLD', '0.5');
+    $chunkSize = 8000;
+    $chunks = [];
+    while (mb_strlen($text) > 0) {
+        $chunks[] = mb_substr($text, 0, $chunkSize);
+        $text = mb_substr($text, $chunkSize);
+    }
+    if (!$chunks) $chunks = [''];
+    $outText = '';
+    $mappings = [];
+    foreach ($chunks as $chunk) {
+        $payload = json_encode([
+            'text' => $chunk,
+            'language' => 'de',
+            'score_threshold' => $threshold,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        try {
+            $raw = mirmir_http($base . '/obfuscate', 'POST', $payload,
+                ['Content-Type: application/json'], 90);
+        } catch (Throwable $e) {
+            mirmir_log('PII obfuscate fehlgeschlagen (' . $e->getMessage() . ') – Ingest ohne Filter (fail open)');
+            return null;
+        }
+        $res = json_decode($raw, true);
+        if (!is_array($res) || !isset($res['obfuscated_text'])) {
+            mirmir_log('PII obfuscate: ungueltige Antwort – Ingest ohne Filter (fail open)');
+            return null;
+        }
+        $outText .= (string) $res['obfuscated_text'];
+        foreach (($res['mappings'] ?? []) as $tok => $orig) {
+            $mappings[(string) $tok] = (string) $orig;
+        }
+    }
+    return ['text' => $outText, 'mappings' => $mappings];
+}
+
+/** PII Variante B: Tokens zurueckersetzen (nur RAM-Mappings, laengste zuerst). */
+function mirmir_pii_deobfuscate(string $text, array $mappings): string {
+    if (!$mappings) return $text;
+    $ordered = [];
+    foreach (array_keys($mappings) as $tok) {
+        $ordered[$tok] = $mappings[$tok];
+    }
+    uksort($ordered, fn($a, $b) => mb_strlen($b) <=> mb_strlen($a));
+    return strtr($text, $ordered);
+}
+
 function mirmir_process(string $text, string $template, string $userTitle): void {
     try {
         // URL-Erkennung: Wenn der Text eine URL ist, Inhalt holen (Fallback: Originaltext)
@@ -485,6 +539,24 @@ function mirmir_process(string $text, string $template, string $userTitle): void
                 $template = 'web';
             }
         }
+        // PII Variante B: Eingabetext obfuskieren, Mappings NUR im RAM –
+        // der LLM sieht nur Tokens (PERSON_1, EMAIL_1, ...). Bei Service-
+        // Fehler fail open (Ingest laeuft unfiltriert weiter, Warnung im Log).
+        $piiMappings = [];
+        $piiSuffix = '';
+        if (mirmir_cfg('MIRMIR_PII_ENABLED', 'true') === 'true') {
+            $obf = mirmir_pii_obfuscate($displayText);
+            if ($obf !== null) {
+                $displayText = $obf['text'];
+                $piiMappings = $obf['mappings'];
+                $piiSuffix = "\nWICHTIG: Der Eingabetext enthaelt Pseudonym-Platzhalter wie "
+                    . "PERSON_1, EMAIL_1, ORT_1. Uebernimm diese Tokens WOERTLICH und "
+                    . "UNVERAENDERT in deine Antwort (Teilnehmer, Namen, Kontakte). "
+                    . "Erfinde keine Namen und loese keine Tokens auf.";
+                mirmir_log('PII: ' . count($piiMappings) . ' Token, obfuskiert zu '
+                    . mb_strlen($displayText) . ' Zeichen');
+            }
+        }
         // 1) LLM aufrufen
         // x-opencode-session: req. seit 2026-09 von opencode-zen; beliebiger
         // Wert wird akzeptiert (keine Server-Validierung), aber ohne Header
@@ -493,7 +565,7 @@ function mirmir_process(string $text, string $template, string $userTitle): void
         $payload = json_encode([
             'model' => mirmir_cfg('MIRMIR_LLM_MODEL'),
             'messages' => [
-                ['role' => 'system', 'content' => mirmir_prompt($template)],
+                ['role' => 'system', 'content' => mirmir_prompt($template) . $piiSuffix],
                 ['role' => 'user',   'content' => $displayText],
             ],
             'response_format' => ['type' => 'json_object'],
@@ -509,6 +581,8 @@ function mirmir_process(string $text, string $template, string $userTitle): void
         if (!$answer) throw new Exception('LLM leere Antwort: ' . substr($raw, 0, 200));
         // Roh-Log: vollständige LLM-Antwort je Ingest (Forensik bei
         // Fremd-Halluzinationen – Rotation auf die letzten 20 Dateien).
+        // Bei aktivem PII-Filter (Variante B) steht hier nur die tokenisierte
+        // Antwort (PERSON_1, ...), kein Klartext.
         try {
             $rawDir = __DIR__ . '/llm-raw';
             if (!is_dir($rawDir)) @mkdir($rawDir, 0755, true);
@@ -526,6 +600,11 @@ function mirmir_process(string $text, string $template, string $userTitle): void
 
         // 2) JSON extrahieren (tolerant gegen Codefences)
         $clean = trim(preg_replace('/^```(?:json)?|```$/m', '', trim($answer)));
+        // PII: Tokens zurueckersetzen – Wiki-Seite zeigt echte Namen/Teilnehmer,
+        // llm-raw behaelt die tokenisierte Antwort (kein Klartext dort).
+        if ($piiMappings) {
+            $clean = mirmir_pii_deobfuscate($clean, $piiMappings);
+        }
         $s = strpos($clean, '{'); $e = strrpos($clean, '}');
         if ($s === false || $e === false || $e <= $s) throw new Exception('kein JSON in Antwort');
         $sum = json_decode(substr($clean, $s, $e - $s + 1), true);
