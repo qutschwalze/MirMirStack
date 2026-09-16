@@ -20,6 +20,7 @@ Endpoints:
 """
 import logging
 import os
+import re
 import threading
 
 from fastapi import FastAPI, Request
@@ -98,6 +99,45 @@ _SECRET_KV_PATTERNS = [
 _TOKEN_LOCK = threading.Lock()
 _token_counter = 0
 
+# Fuell-/ASR-Woerter, die spaCy gern als PERSON/ORG missklassifiziert (de+en)
+_PERSON_STOPWORDS = frozenset("""
+der die das den dem des ein eine einen einem und oder aber ist sind war waren wird
+nicht kein keine mit ohne fuer auf bei von zum zur als wie wenn dann da hier dort ja
+nein doch wohl sehr mehr noch auch nur mir mich dich dir uns euch ihnen haben hatte bin
+the a an and or but is are was were be been not no with without for from to of in on at
+by as if when then there here yes yeah yep right you your yours we our they their it its
+he him she her do does did have has had this that these those who what where which
+""".split())
+
+
+def _looks_like_name(orig: str, text: str) -> bool:
+    """Grober Namens-Check gegen NER-/ASR-False-Positives (PERSON/ORG).
+
+    Verwirft Tokens deren Original wie ein Verb/Substantiv aussieht statt wie
+    ein Name: Stoppwort, Wort <3 Zeichen, Kleinschreibung am Wortanfang,
+    oder ein Einzelwort, das im Text auch kleingeschrieben vorkommt
+    (Satzanfangs-Grossschreibung von Verben wie 'Abonniert').
+    """
+    if not orig:
+        return False
+    # Namen bestehen aus Buchstaben: Zeitstempel/Nummern raus (00:10:10)
+    if not re.search(r"[A-Za-z\u00C0-\u024F]", orig):
+        return False
+    if sum(1 for c in orig if c.isdigit()) > sum(1 for c in orig if c.isalpha()):
+        return False
+    words = orig.split()
+    if any(w.lower() in _PERSON_STOPWORDS for w in words):
+        return False
+    if any(len(w) < 3 for w in words):
+        return False
+    if any(w[0].islower() for w in words):
+        return False
+    if len(words) == 1:
+        low = orig.lower()
+        if low != orig and re.search(r"(?<![\w])" + re.escape(low) + r"(?![\w])", text):
+            return False
+    return True
+
 
 def _next_token() -> int:
     global _token_counter
@@ -151,7 +191,7 @@ class DeobfuscateReq(BaseModel):
     mappings: dict[str, str]
 
 
-app = FastAPI(title="pii-obfuscator", version="0.5.0")
+app = FastAPI(title="pii-obfuscator", version="0.6.0")
 
 
 @app.exception_handler(Exception)
@@ -208,6 +248,11 @@ def _tokenize(text: str, results) -> tuple[str, dict]:
         if any(r.start < k.end and k.start < r.end for k in kept):
             continue
         kept.append(r)
+    # Name-Qualitaetsfilter gegen NER-/ASR-False-Positives (PERSON/ORG):
+    # nur tokens vergeben, deren Original wie ein Eigenname aussieht.
+    kept = [r for r in kept
+            if r.entity_type not in ("PERSON", "ORGANIZATION")
+            or _looks_like_name(text[r.start:r.end], text)]
     kept.sort(key=lambda r: r.start)
 
     with _TOKEN_LOCK:

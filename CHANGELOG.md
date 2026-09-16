@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## server-plugin 0.6 (2026-09-16)
+
+**Name-Qualitätsfilter: ASR-Falschpersonen raus**
+
+- pii-obfuscator 0.6.0: `_looks_like_name()` filtert PERSON/ORG-Treffer, deren Original nicht wie ein Eigenname aussieht — Stoppwörter (ja/yeah/right/der/die/…), Wörter <3 Zeichen, Kleinschreibung, Kleinschreib-Vorkommen im Text (Satzanfangs-Verben wie „abonniert") sowie reine Ziffern-/Zeitstempel-Zeichenfolgen.
+- Wirkt deterministisch vor der Token-Vergabe; der LLM sieht nur noch plausible Namen als Tokens.
+- Messung am realen EN-Transkript (Keycloak-Meeting): **137 → 61 Tokens**; Personen-Flut von 15 uneindeutigen Tag-Werten („Ja", „hout", „Das fand uns X-Wiki"…) auf 6 eindeutige Teilnehmer (Bea, Matthias, Karan Bowland, Romonio, Putin, + ASR-Grenzfall „Kubernettes"). EN/DE-Regression und E2E (7 Tokens, kein Klartext) bestanden.
+
 ## server-plugin 0.5 (2026-09-16)
 
 **Zwei Sprachen: englische Meetings korrekt gefiltert**
