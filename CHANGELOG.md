@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## server-plugin 0.4 (2026-09-16)
+
+**API-Keys & Passwörter werden vor dem LLM-Call ersetzt**
+
+- pii-obfuscator 0.4.0: Neue Erkennung für Secrets — Präfix-Patterns für OpenAI/Anthropic/GitHub-PAT/AWS/Google/Stripe/Slack/JWT/Bearer-Tokens (`APIKEY_n`) sowie Passwörter im Key-Value-Kontext (`passwort=|password=|token:` etc., nur der Wert wird ersetzt, Schlüsselwort bleibt sichtbar; `SECRET_n`).
+- Overlap-Dedupe bevorzugt jetzt gezielte Pattern-Recognizer vor spaCy-NER (Recognizer-Name aus `recognition_metadata`), damit z. B. `token: XyZ…` nicht als ORG missklassifiziert wird.
+- Verifiziert end-to-end: Test-Ingest mit Fake-Key/PAT/Passwort — Roh-Log nur Tokens, kein Klartext, Roundtrip exakt.
+
 ## server-plugin 0.3 (2026-09-16)
 
 **Variante B: PII-Tokenisierung vor dem LLM-Call**

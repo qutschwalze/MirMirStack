@@ -52,6 +52,8 @@ ENTITY_SHORT = {
     "URL": "URL",
     "CREDIT_CARD": "KARTE",
     "IBAN_CODE": "IBAN",
+    "API_KEY": "APIKEY",
+    "PASSWORD": "SECRET",
 }
 
 _DE_PHONE_PATTERNS = [
@@ -59,6 +61,30 @@ _DE_PHONE_PATTERNS = [
     Pattern("de_phone_intl", r"(?<!\d)(?:\+49|0049)[\d\s\/\-\(\)]{7,14}\d(?!\d)", 0.85),
     # Lokale Nummer: 0 + Vorwahl, optional Trenner, 5-10 Ziffern
     Pattern("de_phone_local", r"(?<!\d)0\d{2,4}[\s\/\-]?\d{5,10}(?!\d)", 0.7),
+]
+
+# API-Keys/Tokens mit bekanntem Praefix (hohe Treffsicherheit)
+_SECRET_KEY_PATTERNS = [
+    Pattern("cred_openai", r"\b(?:sk|pk)-(?:proj-)?[A-Za-z0-9_-]{20,}", 0.9),
+    Pattern("cred_anthropic", r"\bsk-ant-[A-Za-z0-9_-]{20,}", 0.9),
+    Pattern("cred_github", r"\bgh[pousr]_[A-Za-z0-9]{36,}", 0.9),
+    Pattern("cred_githubpat", r"\bgithub_pat_[A-Za-z0-9_]{22,}", 0.9),
+    Pattern("cred_aws", r"\bAKIA[0-9A-Z]{16}", 0.9),
+    Pattern("cred_google", r"\bAIza[0-9A-Za-z_-]{35}", 0.9),
+    Pattern("cred_stripe", r"\bsk_(?:live|test)_[A-Za-z0-9]{16,}", 0.9),
+    Pattern("cred_slack", r"\bxox[baprs]-[A-Za-z0-9-]{10,}", 0.9),
+    Pattern("cred_jwt", r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", 0.9),
+    Pattern("cred_bearer", r"\bBearer\s+[A-Za-z0-9._~+/=-]{20,}", 0.85),
+]
+
+# Passwoerter/Secrets im Key-Value-Kontext (konservativer Score).
+# Lookbehind (nur der Wert wird ersetzt), damit das Schluesselwort
+# sichtbar bleibt - der LLM erkennt sonst nicht, dass es ein Secret war.
+_SECRET_KV_PATTERNS = [
+    Pattern("cred_kv",
+            r"(?i)(?<=\b(?:passwort|password|pwd|secret|api[_-]?key|apikey|token)"
+            r"\s{0,3}[:=]\s{0,3})[\"']?[A-Za-z0-9._~+/=!%@-]{8,}[\"']?(?=\s|$|[,;])",
+            0.75),
 ]
 
 _TOKEN_LOCK = threading.Lock()
@@ -82,6 +108,12 @@ def _build_engine() -> AnalyzerEngine:
     registry.add_recognizer(PatternRecognizer(
         supported_entity="PHONE_NUMBER", supported_language="de", name="PhoneDE",
         patterns=_DE_PHONE_PATTERNS))
+    registry.add_recognizer(PatternRecognizer(
+        supported_entity="API_KEY", supported_language="de", name="SecretKey",
+        patterns=_SECRET_KEY_PATTERNS))
+    registry.add_recognizer(PatternRecognizer(
+        supported_entity="PASSWORD", supported_language="de", name="SecretKV",
+        patterns=_SECRET_KV_PATTERNS))
     return AnalyzerEngine(registry=registry, nlp_engine=nlp_engine,
                           supported_languages=["de"],
                           default_score_threshold=DEFAULT_THRESHOLD)
@@ -103,7 +135,7 @@ class DeobfuscateReq(BaseModel):
     mappings: dict[str, str]
 
 
-app = FastAPI(title="pii-obfuscator", version="0.3.0")
+app = FastAPI(title="pii-obfuscator", version="0.4.0")
 
 
 @app.exception_handler(Exception)
@@ -143,7 +175,14 @@ def _tokenize(text: str, results) -> tuple[str, dict]:
     dann Text aus Original-Spannen neu zusammensetzen. Kein Presidio-Anonymizer
     noetig, dadurch exakte Positionen und kontrollierte Token-Namen.
     """
-    ranked = sorted(results, key=lambda r: (-r.score, r.start, -(r.end - r.start)))
+    # Overlap-Dedupe: gezielte Pattern-Recognizer schlagen spaCy-NER
+    # (geraten), innerhalb einer Klasse hoeherer Score zuerst.
+    def _is_spacy(r):
+        md = getattr(r, "recognition_metadata", None) or {}
+        return md.get("recognizer_name") == "SpacyRecognizer"
+
+    ranked = sorted(results, key=lambda r: (_is_spacy(r),
+                                            -r.score, r.start, -(r.end - r.start)))
     kept = []
     for r in ranked:
         if any(r.start < k.end and k.start < r.end for k in kept):
