@@ -594,7 +594,7 @@ function mirmir_process(string $text, string $template, string $userTitle): void
             'Authorization: Bearer ' . mirmir_cfg("MIRMIR_LLM_KEY", ""),
             'Content-Type: application/json',
             'x-opencode-session: ' . $sessionId,
-        ], 120);
+        ], 300);
         $llm = json_decode($raw, true);
         $answer = $llm['choices'][0]['message']['content'] ?? null;
         if (!$answer) throw new Exception('LLM leere Antwort: ' . substr($raw, 0, 200));
