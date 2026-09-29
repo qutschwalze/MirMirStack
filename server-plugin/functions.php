@@ -590,11 +590,32 @@ function mirmir_process(string $text, string $template, string $userTitle): void
             'response_format' => ['type' => 'json_object'],
             'temperature' => 0.2,
         ]);
-        $raw = mirmir_http(mirmir_cfg("MIRMIR_LLM_URL", ""), 'POST', $payload, [
-            'Authorization: Bearer ' . mirmir_cfg("MIRMIR_LLM_KEY", ""),
+        // Retry mit Backoff: das LLM-Gateway liefert bei Lastspitzen sporadisch
+        // 5xx/Timeouts. Ein einzelner Hänger darf den Import nicht killen.
+        // Retry nur bei 5xx/Netzfehlern – 4xx (401/400) bleibt sofort fatal.
+        $llmHeaders = [
+            'Authorization: ' . 'Bearer' . ' ' . mirmir_cfg("MIRMIR_LLM_KEY", ""),
             'Content-Type: application/json',
             'x-opencode-session: ' . $sessionId,
-        ], 300);
+        ];
+        $raw = null;
+        $lastErr = '';
+        foreach ([0, 20, 45, 90] as $attempt => $backoff) {
+            if ($backoff > 0) {
+                mirmir_log("LLM-Versuch $attempt nach $backoff s Pause erneut …");
+                sleep($backoff);
+            }
+            try {
+                $raw = mirmir_http(mirmir_cfg("MIRMIR_LLM_URL", ""), 'POST', $payload, $llmHeaders, 300);
+                break;
+            } catch (Exception $e) {
+                $lastErr = $e->getMessage();
+                // 4xx = Konfiguration/Auth, Retry sinnlos
+                if (preg_match('/HTTP 4\d\d/', $lastErr)) throw $e;
+                mirmir_log("LLM fehlgeschlagen (Versuch " . ($attempt + 1) . "/4): $lastErr");
+            }
+        }
+        if ($raw === null) throw new Exception("LLM nach 4 Versuchen fehlgeschlagen: $lastErr");
         $llm = json_decode($raw, true);
         $answer = $llm['choices'][0]['message']['content'] ?? null;
         if (!$answer) throw new Exception('LLM leere Antwort: ' . substr($raw, 0, 200));
@@ -755,11 +776,17 @@ function mirmir_http(string $url, string $method, ?string $body, array $headers,
     $res = curl_exec($ch);
     if ($res === false) {
         $err = curl_error($ch);
+        $errno = curl_errno($ch);
         curl_close($ch);
-        throw new Exception("HTTP fehlgeschlagen: $err");
+        throw new Exception("HTTP fehlgeschlagen: $err (errno $errno, timeout $timeout s)");
     }
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    if ($code >= 400) throw new Exception("HTTP $code: " . substr((string)$res, 0, 200));
+    if ($code >= 400) {
+        // Roh-Antwort mitloggen: bei sporadischen 5xx des LLM-Gateways ist
+        // der Body die einzige Infoquelle (bisher kam nur "Unknown Error").
+        mirmir_log("HTTP $code von $url body=" . substr(preg_replace('/\s+/', ' ', (string)$res), 0, 400));
+        throw new Exception("HTTP $code: " . substr((string)$res, 0, 200));
+    }
     return (string)$res;
 }
