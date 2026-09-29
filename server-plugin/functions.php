@@ -581,41 +581,63 @@ function mirmir_process(string $text, string $template, string $userTitle): void
         // Wert wird akzeptiert (keine Server-Validierung), aber ohne Header
         // liefert der Gateway 400 MissingSessionID.
         $sessionId = 'mirmirstack-' . md5((string) microtime(true));
-        $payload = json_encode([
-            'model' => mirmir_cfg('MIRMIR_LLM_MODEL'),
-            'messages' => [
-                ['role' => 'system', 'content' => mirmir_prompt($template) . $piiSuffix],
-                ['role' => 'user',   'content' => $displayText],
-            ],
-            'response_format' => ['type' => 'json_object'],
-            'temperature' => 0.2,
-        ]);
-        // Retry mit Backoff: das LLM-Gateway liefert bei Lastspitzen sporadisch
-        // 5xx/Timeouts. Ein einzelner Hänger darf den Import nicht killen.
-        // Retry nur bei 5xx/Netzfehlern – 4xx (401/400) bleibt sofort fatal.
+        $sysContent = mirmir_prompt($template) . $piiSuffix;
         $llmHeaders = [
             'Authorization: ' . 'Bearer' . ' ' . mirmir_cfg("MIRMIR_LLM_KEY", ""),
             'Content-Type: application/json',
             'x-opencode-session: ' . $sessionId,
         ];
+        // Modell-Kette: Primaermodell mit Backoff-Retries, danach ein
+        // Rueckfallmodell. opencode-zen/go verliert einzelne Requests
+        // unabhaengig von der Input-Groesse (Timeout ohne Bytes oder 5xx),
+        // dann ist ein zweites Modell schneller als weiteres Warten.
+        // 4xx (401/400) bleibt sofort fatal – Auth/Konfiguration, kein Retry.
+        $models = array_values(array_filter([
+            mirmir_cfg('MIRMIR_LLM_MODEL'),
+            mirmir_cfg('MIRMIR_LLM_MODEL_FALLBACK', 'deepseek-v4.1-flash'),
+        ]));
+        $timeouts = [180, 180, 120];   // Retries Primarmodell, dann Fallback
+        $backoffs = [0, 20, 45];
         $raw = null;
         $lastErr = '';
-        foreach ([0, 20, 45, 90] as $attempt => $backoff) {
-            if ($backoff > 0) {
-                mirmir_log("LLM-Versuch $attempt nach $backoff s Pause erneut …");
-                sleep($backoff);
+        $usedModel = '';
+        foreach ($models as $mi => $model) {
+            $payload = json_encode([
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $sysContent],
+                    ['role' => 'user',   'content' => $displayText],
+                ],
+                'response_format' => ['type' => 'json_object'],
+                'temperature' => 0.2,
+            ]);
+            $tries = ($mi === 0) ? 3 : 1;
+            for ($attempt = 0; $attempt < $tries; $attempt++) {
+                $backoff = $backoffs[$attempt] ?? 0;
+                if ($backoff > 0) {
+                    mirmir_log("LLM $model: {$backoff}s Pause, Versuch " . ($attempt + 1) . "/$tries");
+                    sleep($backoff);
+                }
+                try {
+                    $raw = mirmir_http(mirmir_cfg("MIRMIR_LLM_URL", ""), 'POST', $payload,
+                        $llmHeaders, $timeouts[$mi] ?? 120);
+                    $usedModel = $model;
+                    break;
+                } catch (Exception $e) {
+                    $lastErr = $e->getMessage();
+                    // 401/403 = Key ungueltig -> auch das Fallback-Modell
+                    // scheitert, sofort abbrechen. 400/404 = Modell nicht
+                    // verfuegbar -> auf das naechste Modell wechseln.
+                    if (preg_match('/HTTP (401|403)/', $lastErr)) throw $e;
+                    mirmir_log("LLM $model fehlgeschlagen (" . ($attempt + 1) . "/$tries): $lastErr");
+                }
             }
-            try {
-                $raw = mirmir_http(mirmir_cfg("MIRMIR_LLM_URL", ""), 'POST', $payload, $llmHeaders, 300);
-                break;
-            } catch (Exception $e) {
-                $lastErr = $e->getMessage();
-                // 4xx = Konfiguration/Auth, Retry sinnlos
-                if (preg_match('/HTTP 4\d\d/', $lastErr)) throw $e;
-                mirmir_log("LLM fehlgeschlagen (Versuch " . ($attempt + 1) . "/4): $lastErr");
-            }
+            if ($raw !== null) break;
         }
-        if ($raw === null) throw new Exception("LLM nach 4 Versuchen fehlgeschlagen: $lastErr");
+        if ($raw === null) throw new Exception("LLM nach " . count($models) . " Modellen fehlgeschlagen: $lastErr");
+        if ($usedModel !== mirmir_cfg('MIRMIR_LLM_MODEL')) {
+            mirmir_log("LLM-Fallback verwendet: $usedModel");
+        }
         $llm = json_decode($raw, true);
         $answer = $llm['choices'][0]['message']['content'] ?? null;
         if (!$answer) throw new Exception('LLM leere Antwort: ' . substr($raw, 0, 200));
@@ -629,7 +651,7 @@ function mirmir_process(string $text, string $template, string $userTitle): void
             $rawFile = $rawDir . '/' . date('Ymd-His') . '-' . substr(md5((string) microtime(true)), 0, 8) . '.json';
             @file_put_contents($rawFile, json_encode([
                 'time' => date('c'),
-                'model' => mirmir_cfg('MIRMIR_LLM_MODEL'),
+                'model' => $usedModel,
                 'session' => $sessionId,
                 'answer' => $answer,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
