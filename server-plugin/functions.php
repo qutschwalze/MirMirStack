@@ -60,74 +60,16 @@ function mirmir_ensure_chapter(int $bookId, string $name): int {
         if ($c['name'] === $name) return (int) $c['id'];
     }
     $created = json_decode(mirmir_api('POST', '/chapters', json_encode([
-        'book_id' => $bookId, 'name' => $name, 'priority' => 0,
+        'book_id' => $bookId, 'name' => $name,
     ])), true);
     $cid = (int) ($created['id'] ?? 0);
     if ($cid) {
-        // Neueste Kapitel oben: einmalig neu sortieren
-        try { mirmir_reorder_chapters($bookId); } catch (Throwable $e) {}
         return $cid;
     }
     return $cid;
 }
 
-/**
- * Re-sortiert alle Seiten eines Kapitels so, dass neueste oben stehen:
- * Sortiert nach created_at DESC, setzt priority 0,1,2...
- * BookStack sortiert aufsteigend nach priority, tie-break ist created_at ASC,
- * deshalb muss priority selbst die Reihenfolge tragen. Negative Werte werden
- * auf 0 geklemmt, also schieben wir bestehende nach unten.
- */
-function mirmir_reorder_pages(int $chapterId): void {
-    $pages = json_decode(mirmir_api('GET', "/pages?count=100&filter[chapter_id]=$chapterId"), true);
-    $list = $pages['data'] ?? [];
-    if (count($list) <= 1) return;
-    usort($list, function($a,$b){
-        return strcmp($b['created_at'] ?? '', $a['created_at'] ?? '');
-    });
-    foreach ($list as $idx => $pg) {
-        $pid = (int) $pg['id'];
-        $currentPri = $pg['priority'] ?? 999;
-        if ((int)$currentPri === $idx) continue; // schon korrekt
-        // Detail holen fuer html (API-Liste hat kein html)
-        $detail = json_decode(mirmir_api('GET', "/pages/$pid"), true);
-        $html = $detail['html'] ?? $pg['html'] ?? '<p></p>';
-        $name = $detail['name'] ?? $pg['name'];
-        $tags = $detail['tags'] ?? [];
-        // tag-Format fuer PUT: [{name,value}]
-        $tagPayload = [];
-        foreach ($tags as $t) {
-            if (isset($t['name']) && isset($t['value'])) $tagPayload[] = ['name'=>$t['name'],'value'=>$t['value']];
-        }
-        mirmir_api('PUT', "/pages/$pid", json_encode([
-            'chapter_id' => $chapterId,
-            'name' => $name,
-            'html' => $html,
-            'tags' => $tagPayload,
-            'priority' => $idx,
-        ]));
-    }
-}
 
-/** Re-sortiert Kapitel eines Buches: neuestes (Name DESC, also YYYY-MM) oben. */
-function mirmir_reorder_chapters(int $bookId): void {
-    $chapters = json_decode(mirmir_api('GET', "/chapters?count=100&filter[book_id]=$bookId"), true);
-    $list = array_values(array_filter($chapters['data'] ?? [], fn($c) => (int)($c['book_id'] ?? 0) === $bookId));
-    if (count($list) <= 1) return;
-    usort($list, function($a,$b){
-        // Name ist YYYY-MM, lexikografisch DESC = neueste oben
-        return strcmp($b['name'] ?? '', $a['name'] ?? '');
-    });
-    foreach ($list as $idx => $ch) {
-        $cid = (int) $ch['id'];
-        if ((int)($ch['priority'] ?? 999) === $idx) continue;
-        mirmir_api('PUT', "/chapters/$cid", json_encode([
-            'book_id' => $bookId,
-            'name' => $ch['name'],
-            'priority' => $idx,
-        ]));
-    }
-}
 /**
  * Storage-Root fuer Attachments: Der API-Pfad (z. B. "uploads/files/2026-08-Aug/x")
  * ist relativ zum configured Storage. Im LSIO-Container zeigt
@@ -284,12 +226,8 @@ Theme::listen(ThemeEvents::APP_BOOT, function () {
                 'chapter_id' => $chapterId,
                 'name' => $pageTitle,
                 'html' => '<p>Hier landen geteilte Dateien unbekannter Formate (Datensammler).</p>',
-                'priority' => 0,
             ])), true);
             $pageId = (int) ($created['id'] ?? 0);
-            if ($pageId) {
-                try { mirmir_reorder_pages($chapterId); } catch (Throwable $e) {}
-            }
         }
         if (!$pageId) {
             return response()->json(['error' => 'page creation failed'], 500);
@@ -710,19 +648,17 @@ function mirmir_process(string $text, string $template, string $userTitle): void
         }
         if (!$chapterId) {
             $created = json_decode(mirmir_api('POST', '/chapters',
-                json_encode(['book_id' => (int)mirmir_cfg('MIRMIR_BOOK_ID', '3'), 'name' => $month, 'priority' => 0])), true);
+                json_encode(['book_id' => (int)mirmir_cfg('MIRMIR_BOOK_ID', '3'), 'name' => $month])), true);
             $chapterId = $created['id'] ?? null;
             if (!$chapterId) throw new Exception('Kapitel konnte nicht angelegt werden');
-            try { mirmir_reorder_chapters((int)mirmir_cfg('MIRMIR_BOOK_ID', '3')); } catch (Throwable $e) {}
         }
 
-        // 6) Seite anlegen/updaten (Idempotenz ueber Namen) – neue Seite immer ganz oben
         $pageTitle = date('Y-m-d') . ' ' . trim($sum['title']);
         $existing = json_decode(mirmir_api('GET',
             '/pages?count=10&filter[name]=' . urlencode($pageTitle) . "&filter[chapter_id]=$chapterId"), true);
         $pagePayload = json_encode([
             'chapter_id' => $chapterId, 'name' => $pageTitle,
-            'html' => $html, 'tags' => $tags, 'priority' => 0,
+            'html' => $html, 'tags' => $tags,
         ]);
         if (!empty($existing['data'][0]['id'])) {
             $pid = $existing['data'][0]['id'];
@@ -734,8 +670,6 @@ function mirmir_process(string $text, string $template, string $userTitle): void
             if (!$pid) throw new Exception('Seite konnte nicht angelegt werden');
             mirmir_log("created page $pid: $pageTitle");
         }
-        // Neueste Seite immer ganz oben: Kapitel neu sortieren
-        try { mirmir_reorder_pages($chapterId); } catch (Throwable $e) {}
 
         // 7) Original als Attachment
         $tmp = tempnam(sys_get_temp_dir(), 'mmi');
