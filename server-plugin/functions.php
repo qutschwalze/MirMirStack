@@ -14,7 +14,7 @@
 /**
  * Konfiguration ueber BookStack-.env (keine Secrets im Theme-Code):
  * MIRMIR_INGEST_TOKEN, mirmir_cfg("MIRMIR_LLM_KEY", ""), MIRMIR_API_TOKEN_ID, MIRMIR_API_TOKEN_SECRET
- * Optional: mirmir_cfg('MIRMIR_LLM_URL', 'https://opencode.ai/zen/go/v1/chat/completions'), mirmir_cfg('MIRMIR_LLM_MODEL', 'mimo-v2.5'), (int)mirmir_cfg('MIRMIR_BOOK_ID', '3'), mirmir_cfg('MIRMIR_API_BASE', 'http://localhost:6875/api')
+ * Optional: mirmir_cfg('MIRMIR_LLM_URL', 'https://opencode.ai/zen/go/v1/chat/completions'), mirmir_cfg('MIRMIR_LLM_MODEL', 'mimo-v2.6-flash'), (int)mirmir_cfg('MIRMIR_BOOK_ID', '3'), mirmir_cfg('MIRMIR_API_BASE', 'http://localhost:6875/api')
  */
 function mirmir_cfg(string $key, string $default = ''): string {
     $v = getenv($key);

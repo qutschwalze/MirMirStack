@@ -2,6 +2,14 @@
 
 Alle Versionswechsel werden hier dokumentiert. Jeder Build erhöht `versionCode` + `versionName` (siehe `app/build.gradle.kts`).
 
+## server-plugin 0.7 (2026-10-30)
+
+**LLM-Modell auf mimo-v2.6-flash umgestellt (mimo-v2.5 deprecated)**
+
+- `MIRMIR_LLM_MODEL` von `mimo-v2.5` auf `mimo-v2.6-flash` umgestellt: docker-compose.yml und App-.env auf der VM, Container neu erstellt. `MIRMIR_LLM_MODEL_FALLBACK=deepseek-v4.1-flash` unverändert.
+- README-Beispiel und Doc-Kommentar in `functions.php` (Repo + deployt) angeglichen.
+- Verifiziert: Container-Env `mimo-v2.6-flash`; Gateway-Call mit Plugin-Payload (json_object + Session-Header) liefert HTTP 200, Modell `mimo-v2.6-flash`, Antwort `{"ok":true}`.
+
 ## server-plugin 0.6 (2026-09-16)
 
 **Name-Qualitätsfilter: ASR-Falschpersonen raus**

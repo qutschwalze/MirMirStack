@@ -51,7 +51,7 @@ ihn bewusst); keine Pfad-Eingaben von aussen.
        - MIRMIR_INGEST_TOKEN=<zufalliges Secret>
        - MIRMIR_LLM_URL=https://opencode.ai/zen/go/v1/chat/completions
        - MIRMIR_LLM_KEY=<key>
-       - MIRMIR_LLM_MODEL=mimo-v2.5
+       - MIRMIR_LLM_MODEL=mimo-v2.6-flash
        - MIRMIR_API_BASE=http://bookstack/api     # container-intern!
        - MIRMIR_API_TOKEN_ID=<bookstack api token id>
        - MIRMIR_API_TOKEN_SECRET=<bookstack api token secret>
